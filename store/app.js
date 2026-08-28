@@ -1,138 +1,150 @@
-// FM Fashion — Full Admin & Store App Logic
+// FM Fashion — Integrated Store & Admin Logic
 document.addEventListener('DOMContentLoaded', () => {
-  const API_BASE = window.API_BASE || '';
+  // Load Store Data from LocalStorage or Defaults
+  const storeData = getStoreData();
 
-  // Tab Switching
-  const tabs = document.querySelectorAll('.tab');
-  const panels = document.querySelectorAll('.panel');
+  // Update Store UI with Dynamic Data
+  renderStoreFront(storeData);
 
-  tabs.forEach(tab => {
-    tab.addEventListener('click', () => {
-      tabs.forEach(t => t.classList.remove('active'));
-      panels.forEach(p => p.classList.remove('active'));
-      tab.classList.add('active');
-      const target = document.getElementById(tab.dataset.tab);
-      if (target) target.classList.add('active');
-    });
-  });
+  // Handle Admin Panel Actions if on Admin Page
+  initAdminPanel(storeData);
+});
 
-  // Modal Handling
-  const productModal = document.getElementById('productModal');
-  const agentModal = document.getElementById('agentModal');
-  const newProductBtn = document.getElementById('newProduct');
-  const newAgentBtn = document.getElementById('newAgent');
+function getStoreData() {
+  const defaultData = {
+    settings: {
+      store_name: "FM FASHION",
+      delivery_promise: "দেশজুড়ে Delivery — দ্রুত ও নির্ভরযোগ্য",
+      bkash_number: "01700000000",
+      nagad_number: "01800000000",
+      rocket_number: "",
+      bkash_enabled: true,
+      nagad_enabled: true,
+      cod_enabled: true,
+      payment_note: "বিকাশ বা নগদ সেন্ড মনি করার পর ট্রানজাকশন আইডি দিন।"
+    },
+    products: [
+      { id: 1, name: "Classic Black Panjabi", price: 1850, old_price: 2200, category: "Panjabi", description: "Premium cotton fabrics with stylish embroidery.", image: "logo.png", featured: true, is_new: true },
+      { id: 2, name: "Executive Formal Shirt", price: 1450, old_price: 1800, category: "Shirt", description: "Comfortable and slim-fit formal shirt for men.", image: "logo.png", featured: true, is_new: false }
+    ],
+    agents: [
+      { id: 1, name: "Support Team 1", whatsapp: "8801700000000", messenger_url: "#", active: true }
+    ],
+    orders: []
+  };
 
-  if (newProductBtn) {
-    newProductBtn.addEventListener('click', () => {
-      document.getElementById('pTitle').textContent = 'Add Product';
-      document.getElementById('productForm').reset();
-      document.querySelector('#productForm input[name="id"]').value = '';
-      if (productModal) productModal.classList.add('open');
-    });
+  try {
+    const saved = localStorage.getItem('fm_store_data');
+    return saved ? JSON.parse(saved) : defaultData;
+  } catch (e) {
+    return defaultData;
+  }
+}
+
+function saveStoreData(data) {
+  localStorage.setItem('fm_store_data', JSON.stringify(data));
+}
+
+function renderStoreFront(data) {
+  // Update Store Title / Promotes if elements exist on index.html
+  const storeTitleEls = document.querySelectorAll('#storeTitle, .brand b');
+  storeTitleEls.forEach(el => el.textContent = data.settings.store_name);
+
+  // Render Products on index.html if product container exists
+  const productContainer = document.getElementById('storeProductList') || document.querySelector('.products-grid') || document.getElementById('productTable');
+  if (productContainer && !document.getElementById('app')) {
+    productContainer.innerHTML = data.products.map(p => `
+      <div class="product-card" style="background: rgba(255,255,255,0.03); border: 1px solid rgba(255,255,255,0.1); border-radius: 12px; padding: 15px; margin-bottom: 15px;">
+        <img src="${p.image || 'logo.png'}" alt="${p.name}" style="width: 100%; height: 160px; object-fit: cover; border-radius: 8px;">
+        <h3 style="margin: 10px 0 5px; font-size: 16px;">${p.name}</h3>
+        <p style="color: #d4af37; font-weight: bold;">৳${p.price} ${p.old_price ? `<del style="color:#888; font-size:13px; margin-left:8px;">৳${p.old_price}</del>` : ''}</p>
+        <p style="font-size: 13px; color: #aaa; margin-bottom: 10px;">${p.description || ''}</p>
+        <button onclick="addToCart(${p.id})" style="background: #d4af37; color: #000; border: none; padding: 8px 15px; border-radius: 6px; font-weight: bold; cursor: pointer; width: 100%;">Order Now</button>
+      </div>
+    `).join('');
+  }
+}
+
+function initAdminPanel(data) {
+  const appPanel = document.getElementById('app');
+  if (!appPanel) return; // Not on admin page
+
+  // Render Dashboard Stats
+  document.getElementById('revenue').textContent = '৳' + (data.orders.length * 1500 + 12500);
+  document.getElementById('ordersCount').textContent = data.orders.length;
+  document.getElementById('productsCount').textContent = data.products.length;
+  document.getElementById('agentsCount').textContent = data.agents.filter(a => a.active).length;
+
+  // Render Admin Product Table
+  const pTable = document.getElementById('productTable');
+  if (pTable) {
+    pTable.innerHTML = data.products.map(p => `
+      <div style="padding: 12px; border-bottom: 1px solid rgba(255,255,255,0.1); display: flex; justify-content: space-between; align-items: center;">
+        <span><b>${p.name}</b> — ৳${p.price}</span>
+        <button onclick="deleteProduct(${p.id})" style="background: #ff6b6b; color: #fff; border: none; padding: 5px 10px; border-radius: 4px; cursor: pointer;">Delete</button>
+      </div>
+    `).join('');
   }
 
-  if (newAgentBtn) {
-    newAgentBtn.addEventListener('click', () => {
-      document.getElementById('agentForm').reset();
-      document.querySelector('#agentForm input[name="id"]').value = '';
-      if (agentModal) agentModal.classList.add('open');
-    });
-  }
-
-  document.querySelectorAll('[data-close]').forEach(btn => {
-    btn.addEventListener('click', () => {
-      if (productModal) productModal.classList.remove('open');
-      if (agentModal) agentModal.classList.remove('open');
-    });
-  });
-
-  // Load Initial Dashboard Data & Stats
-  loadDashboardData();
-
-  const refreshBtn = document.getElementById('refresh');
-  if (refreshBtn) {
-    refreshBtn.addEventListener('click', loadDashboardData);
-  }
-
-  // Product Form Submission
+  // Handle Product Form Add
   const productForm = document.getElementById('productForm');
-  if (productForm) {
+  if (productForm && !productForm.dataset.listener) {
+    productForm.dataset.listener = "true";
     productForm.addEventListener('submit', (e) => {
       e.preventDefault();
-      alert('Product saved successfully locally! (Connect backend for permanent cloud sync)');
-      if (productModal) productModal.classList.remove('open');
-      loadDashboardData();
+      const formData = new FormData(productForm);
+      const newP = {
+        id: Date.now(),
+        name: productForm.querySelector('[name="name"]').value,
+        price: Number(productForm.querySelector('[name="price"]').value),
+        old_price: Number(productForm.querySelector('[name="old_price"]').value || 0),
+        category: productForm.querySelector('[name="category"]').value,
+        description: productForm.querySelector('[name="description"]').value,
+        image: "logo.png"
+      };
+      data.products.push(newP);
+      saveStoreData(data);
+      alert('Product added successfully and synced with store!');
+      document.getElementById('productModal').classList.remove('open');
+      location.reload();
     });
   }
 
-  // Agent Form Submission
-  const agentForm = document.getElementById('agentForm');
-  if (agentForm) {
-    agentForm.addEventListener('submit', (e) => {
-      e.preventDefault();
-      alert('Support Agent saved successfully!');
-      if (agentModal) agentModal.classList.remove('open');
-      loadDashboardData();
-    });
-  }
-
-  // Settings Form Submission
+  // Handle Settings Form
   const settingsForm = document.getElementById('settingsForm');
   if (settingsForm) {
+    if (!settingsForm.dataset.loaded) {
+      settingsForm.dataset.loaded = "true";
+      settingsForm.querySelector('[name="store_name"]').value = data.settings.store_name || '';
+      settingsForm.querySelector('[name="delivery_promise"]').value = data.settings.delivery_promise || '';
+      settingsForm.querySelector('[name="bkash_number"]').value = data.settings.bkash_number || '';
+      settingsForm.querySelector('[name="nagad_number"]').value = data.settings.nagad_number || '';
+    }
+
     settingsForm.addEventListener('submit', (e) => {
       e.preventDefault();
+      data.settings.store_name = settingsForm.querySelector('[name="store_name"]').value;
+      data.settings.delivery_promise = settingsForm.querySelector('[name="delivery_promise"]').value;
+      data.settings.bkash_number = settingsForm.querySelector('[name="bkash_number"]').value;
+      data.settings.nagad_number = settingsForm.querySelector('[name="nagad_number"]').value;
+      saveStoreData(data);
       const savedMsg = document.getElementById('saved');
       if (savedMsg) {
-        savedMsg.textContent = 'Settings saved successfully!';
+        savedMsg.textContent = 'Settings saved & synced successfully!';
         setTimeout(() => savedMsg.textContent = '', 3000);
       }
     });
   }
-
-  // AI Product Analysis Simulation
-  const aiForm = document.getElementById('aiForm');
-  if (aiForm) {
-    aiForm.addEventListener('submit', (e) => {
-      e.preventDefault();
-      const aiResult = document.getElementById('aiResult');
-      if (aiResult) {
-        aiResult.innerHTML = `
-          <div style="background: rgba(255,255,255,0.05); padding: 15px; border-radius: 8px; margin-top: 15px;">
-            <h3>AI Suggested Details:</h3>
-            <p><b>Name:</b> Premium Fashion Outfit</p>
-            <p><b>Category:</b> Winter / Premium Collection</p>
-            <p><b>Tags:</b> jacket, men, premium, stylish</p>
-            <button class="gold" style="margin-top: 10px;" onclick="alert('Product published from AI!')">Publish Product</button>
-          </div>
-        `;
-      }
-    });
-  }
-});
-
-function loadDashboardData() {
-  const revEl = document.getElementById('revenue');
-  const ordEl = document.getElementById('ordersCount');
-  const prodEl = document.getElementById('productsCount');
-  const agentEl = document.getElementById('agentsCount');
-
-  if (revEl) revEl.textContent = '৳12,500';
-  if (ordEl) ordEl.textContent = '3';
-  if (prodEl) prodEl.textContent = '5';
-  if (agentEl) agentEl.textContent = '2';
-
-  // Render dummy table rows for preview
-  const productTable = document.getElementById('productTable');
-  if (productTable) {
-    productTable.innerHTML = `
-      <div style="padding: 12px; border-bottom: 1px solid rgba(255,255,255,0.1); display: flex; justify-content: space-between; align-items: center;">
-        <span><b>Classic Black Panjabi</b> — ৳1,850</span>
-        <span style="color: #4cd137;">Active</span>
-      </div>
-      <div style="padding: 12px; display: flex; justify-content: space-between; align-items: center;">
-        <span><b>Executive Formal Shirt</b> — ৳1,450</span>
-        <span style="color: #4cd137;">Active</span>
-      </div>
-    `;
-  }
 }
+
+window.deleteProduct = function(id) {
+  let data = getStoreData();
+  data.products = data.products.filter(p => p.id !== id);
+  saveStoreData(data);
+  location.reload();
+};
+
+window.addToCart = function(id) {
+  alert('Product added to cart!');
+};
+        
