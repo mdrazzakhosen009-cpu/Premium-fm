@@ -7,226 +7,70 @@ import crypto from "crypto";
 import bcrypt from "bcryptjs";
 import path from "path";
 import fs from "fs";
-import { fileURLToPath } from "url";
+import {fileURLToPath} from "url";
 
 dotenv.config();
-const __filename = fileURLToPath(import.meta.url);
-const __dirname = path.dirname(__filename);
-const ROOT = __dirname, DATA = path.join(ROOT, "data"), UPLOADS = path.join(ROOT, "uploads");
-fs.mkdirSync(DATA, { recursive: true });
-fs.mkdirSync(UPLOADS, { recursive: true });
-const db = new Database(path.join(DATA, "fm-fashion.db"));
-db.pragma("journal_mode=WAL");
-
+const __filename=fileURLToPath(import.meta.url),__dirname=path.dirname(__filename);
+const ROOT=path.join(__dirname,".."),DATA=path.join(ROOT,"data"),UPLOADS=path.join(ROOT,"uploads");
+fs.mkdirSync(DATA,{recursive:true});fs.mkdirSync(UPLOADS,{recursive:true});
+const db=new Database(path.join(DATA,"fm-fashion.db"));db.pragma("journal_mode=WAL");
 db.exec(`
-CREATE TABLE IF NOT EXISTS products(id INTEGER PRIMARY KEY AUTOINCREMENT,name TEXT NOT NULL,price REAL NOT NULL,old_price REAL,image TEXT,category TEXT,stock INTEGER DEFAULT 0,featured INTEGER DEFAULT 0);
-CREATE TABLE IF NOT EXISTS agents(id INTEGER PRIMARY KEY AUTOINCREMENT,name TEXT NOT NULL,messenger_url TEXT NOT NULL,phone TEXT NOT NULL);
-CREATE TABLE IF NOT EXISTS orders(id INTEGER PRIMARY KEY AUTOINCREMENT,customer_name TEXT NOT NULL,phone TEXT NOT NULL,email TEXT,division TEXT,district TEXT,upazila TEXT,address TEXT NOT NULL,items TEXT NOT NULL,total_amount REAL NOT NULL,delivery_charge REAL NOT NULL,status TEXT DEFAULT 'Pending',created_at DATETIME DEFAULT CURRENT_TIMESTAMP);
+CREATE TABLE IF NOT EXISTS products(id INTEGER PRIMARY KEY AUTOINCREMENT,name TEXT NOT NULL,description TEXT DEFAULT '',price REAL NOT NULL,old_price REAL DEFAULT 0,image TEXT DEFAULT '',category TEXT DEFAULT 'General',tags TEXT DEFAULT '',featured INTEGER DEFAULT 0,is_new INTEGER DEFAULT 0,rating REAL DEFAULT 5,review_count INTEGER DEFAULT 0,created_at TEXT DEFAULT CURRENT_TIMESTAMP);
+CREATE TABLE IF NOT EXISTS agents(id INTEGER PRIMARY KEY AUTOINCREMENT,name TEXT NOT NULL,whatsapp TEXT NOT NULL,messenger_url TEXT DEFAULT '',active INTEGER DEFAULT 1);
+CREATE TABLE IF NOT EXISTS orders(id INTEGER PRIMARY KEY AUTOINCREMENT,customer_name TEXT NOT NULL,phone TEXT NOT NULL,email TEXT DEFAULT '',division TEXT DEFAULT '',district TEXT DEFAULT '',upazila TEXT DEFAULT '',address TEXT NOT NULL,note TEXT DEFAULT '',items_json TEXT NOT NULL,total REAL NOT NULL,payment_method TEXT DEFAULT 'COD',transaction_id TEXT DEFAULT '',status TEXT DEFAULT 'Pending',created_at TEXT DEFAULT CURRENT_TIMESTAMP);
 CREATE TABLE IF NOT EXISTS settings(key TEXT PRIMARY KEY,value TEXT NOT NULL DEFAULT '');
 CREATE TABLE IF NOT EXISTS sessions(token TEXT PRIMARY KEY,expires_at INTEGER NOT NULL);
 `);
-
-// ডিফল্ট সেটিংস এবং পাসওয়ার্ড 'admin123' এর বিক্রিপ্ট হাশ সেট করা হলো
-const defaultPassHash = bcrypt.hashSync("admin123", 10);
-const defaults = {
-    admin_password_hash: defaultPassHash,
-    store_name: "FM FASHION",
-    logo: "assets/logo.png",
-    delivery_charge_inside: "60",
-    delivery_charge_outside: "120",
-    bkash_enabled: "1",
-    bkash_number: "01700000000",
-    nagad_enabled: "1",
-    nagad_number: "01800000000",
-    rocket_enabled: "0",
-    rocket_number: "",
-    cod_enabled: "1",
-    hero_title: "Discover Premium Fashion",
-    hero_subtitle: "Upgrade your wardrobe with our latest exclusive collection.",
-    hero_image: "hero.jpg"
-};
-
-const up = db.prepare("INSERT INTO settings(key,value) VALUES(?,?) ON CONFLICT(key) DO NOTHING");
-for(const [k,v] of Object.entries(defaults)) up.run(k,v);
-
-// যদি আগে থেকেই পাসওয়ার্ড হাশ খালি থাকে তবে 'admin123' সেট করে দেওয়া নিশ্চিত করা
-db.prepare("UPDATE settings SET value = ? WHERE key = 'admin_password_hash' AND (value = '' OR value IS NULL)").run(defaultPassHash);
-
-const app = express();
-app.use(cookieParser());
-app.use(express.json({limit:"10mb"}));
-app.use(express.urlencoded({extended:true}));
-
-app.use((req,res,next)=>{
-    const origin = req.headers.origin;
-    if(origin) {
-        res.setHeader("Access-Control-Allow-Origin", origin);
-        res.setHeader("Access-Control-Allow-Credentials", "true");
-    }
-    res.setHeader("Access-Control-Allow-Headers", "Content-Type, Authorization");
-    res.setHeader("Access-Control-Allow-Methods", "GET,POST,PUT,PATCH,DELETE,OPTIONS");
-    if(req.method==="OPTIONS") return res.sendStatus(204);
-    next();
+const defaults={admin_password_hash:"",store_name:"FM FASHION",logo:"assets/logo.png",delivery_promise:"2–5 working days",payment_note:"Online payment করলে Send Money করে Transaction ID দিন।",bkash_number:"",nagad_number:"",rocket_number:"",bkash_enabled:"1",nagad_enabled:"1",rocket_enabled:"1",cod_enabled:"1"};
+const up=db.prepare("INSERT INTO settings(key,value) VALUES(?,?) ON CONFLICT(key) DO NOTHING");for(const [k,v] of Object.entries(defaults))up.run(k,v);
+const app=express();app.use(express.json({limit:"10mb"}));app.use(express.urlencoded({extended:true}));app.use(cookieParser(process.env.SESSION_SECRET||"change-this-secret"));app.use("/uploads",express.static(UPLOADS));app.use((req,res,next)=>{
+  const origin=req.headers.origin;
+  const allow=process.env.ALLOW_ORIGIN||"*";
+  if(origin && (allow==="*" || allow.split(",").map(x=>x.trim()).includes(origin))){
+    res.setHeader("Access-Control-Allow-Origin",origin);
+    res.setHeader("Vary","Origin");
+    res.setHeader("Access-Control-Allow-Credentials","true");
+  }
+  res.setHeader("Access-Control-Allow-Headers","Content-Type, Authorization");
+  res.setHeader("Access-Control-Allow-Methods","GET,POST,PUT,PATCH,DELETE,OPTIONS");
+  if(req.method==="OPTIONS")return res.sendStatus(204);
+  next();
 });
+const upload=multer({storage:multer.diskStorage({destination:UPLOADS,filename:(r,f,cb)=>cb(null,Date.now()+"-"+crypto.randomBytes(4).toString("hex")+path.extname(f.originalname).toLowerCase())}),limits:{fileSize:8*1024*1024},fileFilter:(r,f,cb)=>cb(["image/jpeg","image/png","image/webp","image/gif"].includes(f.mimetype)?null:Error("Image only"))});
 
-const upload = multer({storage:multer.diskStorage({destination:UPLOADS,filename:(r,f,cb)=>cb(null,Date.now()+"-"+f.originalname)})});
-
-const STORE_DIR = path.join(ROOT, "store");
-const ADMIN_DIR = path.join(ROOT, "admin");
-
-app.use("/uploads", express.static(UPLOADS));
-app.use("/admin", express.static(ADMIN_DIR));
+// Serve the public shop and admin panel from the same server. This keeps the
+// browser on one origin, so admin login/session and file uploads work reliably.
+const STORE_DIR=path.join(ROOT,"store"), ADMIN_DIR=path.join(ROOT,"admin");
+app.use("/admin",express.static(ADMIN_DIR));
 app.use(express.static(STORE_DIR));
-
-app.get("/", (req, res) => {
-    res.sendFile(path.join(STORE_DIR, "index.html"));
-});
-
-app.get("/admin", (req, res) => {
-    res.sendFile(path.join(ADMIN_DIR, "index.html"));
-});
-
-const settingsData = () => Object.fromEntries(db.prepare("SELECT key,value FROM settings").all());
-
-function admin(req, res, next){
-    const t = req.cookies.admin_session;
-    if(!t) return res.status(401).json({error:"Unauthorized"});
-    const s = db.prepare("SELECT * FROM sessions WHERE token=? AND expires_at>?").get(t, Date.now());
-    if(!s) return res.status(401).json({error:"Unauthorized"});
-    next();
-}
-
-// Admin Login Route
-app.post("/api/admin/login", (req, res) => {
-    try {
-        const { password } = req.body;
-        const s = settingsData();
-        let passHash = s.admin_password_hash || defaultPassHash;
-
-        const match = bcrypt.compareSync(password || "", passHash);
-        if (!match) {
-            return res.status(401).json({ error: "Invalid password" });
-        }
-
-        const token = crypto.randomBytes(32).toString("hex");
-        const expires_at = Date.now() + 7 * 24 * 60 * 60 * 1000;
-        db.prepare("INSERT INTO sessions(token, expires_at) VALUES(?, ?)").run(token, expires_at);
-
-        res.cookie("admin_session", token, {
-            httpOnly: true,
-            secure: false,
-            sameSite: "lax",
-            maxAge: 7 * 24 * 60 * 60 * 1000
-        });
-
-        res.json({ success: true });
-    } catch (err) {
-        console.error(err);
-        res.status(500).json({ error: "Internal server error" });
-    }
-});
-
-app.get("/api/admin/me", admin, (req, res) => {
-    res.json({ success: true });
-});
-
-app.post("/api/admin/logout", (req, res) => {
-    const t = req.cookies.admin_session;
-    if (t) {
-        db.prepare("DELETE FROM sessions WHERE token=?").run(t);
-    }
-    res.clearCookie("admin_session");
-    res.json({ success: true });
-});
-
-// Products API
-app.get("/api/products", (req, res) => {
-    const products = db.prepare("SELECT * FROM products ORDER BY id DESC").all();
-    res.json(products);
-});
-
-app.post("/api/products", admin, upload.single("image"), (req, res) => {
-    const { name, price, old_price, category, stock, featured } = req.body;
-    const image = req.file ? `/uploads/${req.file.filename}` : "";
-    const stmt = db.prepare("INSERT INTO products (name, price, old_price, image, category, stock, featured) VALUES (?, ?, ?, ?, ?, ?, ?)");
-    const info = stmt.run(name, price, old_price || null, image, category || "", stock || 0, featured ? 1 : 0);
-    res.json({ id: info.lastInsertRowid, success: true });
-});
-
-app.delete("/api/products/:id", admin, (req, res) => {
-    db.prepare("DELETE FROM products WHERE id=?").run(req.params.id);
-    res.json({ success: true });
-});
-
-// Settings API
-app.get("/api/settings", (req, res) => {
-    const s = settingsData();
-    res.json({
-        store_name: s.store_name,
-        logo: s.logo,
-        hero_title: s.hero_title,
-        hero_subtitle: s.hero_subtitle,
-        hero_image: s.hero_image,
-        payment_methods: {
-            bKash: { enabled: s.bkash_enabled === "1", number: s.bkash_number },
-            Nagad: { enabled: s.nagad_enabled === "1", number: s.nagad_number },
-            Rocket: { enabled: s.rocket_enabled === "1", number: s.rocket_number },
-            COD: { enabled: s.cod_enabled === "1", number: "" }
-        }
-    });
-});
-
-// Agents API
-app.get("/api/agents", (req, res) => {
-    const agents = db.prepare("SELECT * FROM agents").all();
-    res.json(agents);
-});
-
-// Orders API
-app.post("/api/orders", (req, res) => {
-    const { name, phone, email, division, district, upazila, address, items, total } = req.body;
-    const stmt = db.prepare("INSERT INTO orders (customer_name, phone, email, division, district, upazila, address, items, total_amount, delivery_charge) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?)");
-    const info = stmt.run(name || "Customer", phone || "", email || "", division || "", district || "", upazila || "", address || "", JSON.stringify(items || []), total || 0, 60);
-    res.json({ orderId: info.lastInsertRowid, total });
-});
-
-app.get("/api/orders", admin, (req, res) => {
-    const orders = db.prepare("SELECT * FROM orders ORDER BY id DESC").all();
-    res.json(orders);
-});
-
-// Advanced & Smart AI Chat API (সব ধরনের প্রশ্নের উত্তর দেওয়ার জন্য আপডেট করা হয়েছে)
-app.post("/api/chat", (req, res) => {
-    try {
-        const { message } = req.body;
-        const msg = (message || "").toLowerCase().trim();
-        let reply = "আপনার কথাটি বুঝতে পেরেছি। আমাদের এফএম ফ্যাশন স্টোরে আপনাকে স্বাগতম! আপনার যেকোনো সাহায্য বা পণ্যের তথ্যের জন্য আমাদের ওয়েবসাইটে থাকা পণ্য দেখতে পারেন অথবা সরাসরি অর্ডার করতে পারেন।";
-
-        if (msg.includes("hello") || msg.includes("hi") || msg.includes("সালাম") || msg.includes("assalamu alaikum")) {
-            reply = "ওয়ালাইকুমুস সালাম! এফএম ফ্যাশনে আপনাকে স্বাগতম। আজ আপনাকে কীভাবে সাহায্য করতে পারি বলুন?";
-        } else if (msg.includes("price") || msg.includes("দাম") || msg.includes("kemon dam") || msg.includes("koto")) {
-            reply = "আমাদের প্রতিটি পণ্যের গায়ে এবং ছবির নিচেই মূল্য দেওয়া আছে। আপনার পছন্দের পণ্যটি দেখে কার্টে অ্যাড করে অর্ডার করতে পারেন।";
-        } else if (msg.includes("delivery") || msg.includes("ডেলিভারি") || msg.includes("charge") || msg.includes("shipping")) {
-            reply = "আমাদের ডেলিভারি চার্জ ঢাকার ভেতরে ৬০ টাকা এবং ঢাকার বাইরে ১২০ টাকা নির্ধারণ করা হয়েছে।";
-        } else if (msg.includes("order") || msg.includes("অর্ডার") || msg.includes("কিভাবে কিনব")) {
-            reply = "পণ্য কিনতে আপনার পছন্দের প্রোডাক্টের নিচে 'Order Now' বা 'Add to Cart' এ ক্লিক করে আপনার নাম, ঠিকানা ও ফোন নম্বর দিয়ে অর্ডার কনফার্ম করুন।";
-        } else if (msg.includes("bkash") || msg.includes("bKash") || msg.includes("nagad") || msg.includes("payment") || msg.includes("পেমেন্ট")) {
-            reply = "আমরা বিকাশ, নগদ এবং ক্যাশ অন ডেলিভারি (COD) পেমেন্ট পদ্ধতি সমর্থন করি। চেকআউট করার সময় আপনার পছন্দমতো পদ্ধতি বেছে নিতে পারবেন।";
-        } else if (msg.includes("contact") || msg.includes("phone") || msg.includes("number") || msg.includes("যোগাযোগ") || msg.includes("agent")) {
-            reply = "জরুরি প্রয়োজনে আমাদের সাপোর্ট এজেন্টের সাথে যোগাযোগ করতে ডান পাশের চ্যাট বা ফেসবুক মেসেঞ্জার আইকনে ক্লিক করতে পারেন।";
-        } else if (msg.length > 0) {
-            reply = `ধন্যবাদ আপনার বার্তার জন্য ("${message}")। এফএম ফ্যাশনের পক্ষ থেকে আমরা আপনার সেবা নিশ্চিত করতে সর্বদা প্রস্তুত। বিস্তারিত জানতে আমাদের এজেন্টের সাথে কথা বলতে পারেন।`;
-        }
-
-        res.json({ reply });
-    } catch (err) {
-        console.error(err);
-        res.status(500).json({ error: "Chat service error" });
-    }
-});
-
-const PORT = process.env.PORT || 3000;
-app.listen(PORT, () => {
-    console.log(`Server is running on port ${PORT}`);
-});
-    
+const settings=()=>Object.fromEntries(db.prepare("SELECT key,value FROM settings").all().map(x=>[x.key,x.value]));
+const paymentMethods=()=>{const s=settings();return {bKash:{enabled:s.bkash_enabled==="1",number:s.bkash_number},Nagad:{enabled:s.nagad_enabled==="1",number:s.nagad_number},Rocket:{enabled:s.rocket_enabled==="1",number:s.rocket_number},"Cash on Delivery":{enabled:s.cod_enabled==="1",number:""}}};
+const publicProduct=p=>({...p,price:+p.price,old_price:+p.old_price,featured:!!p.featured,is_new:!!p.is_new});
+function admin(req,res,next){const t=req.signedCookies.admin_session;if(!t)return res.status(401).json({error:"Admin login required"});const s=db.prepare("SELECT * FROM sessions WHERE token=? AND expires_at>?").get(t,Date.now());if(!s)return res.status(401).json({error:"Session expired"});next()}
+app.get("/api/settings",(req,res)=>res.json({...settings(),payment_methods:paymentMethods()}));
+app.get("/api/products",(req,res)=>res.json(db.prepare("SELECT * FROM products ORDER BY id DESC").all().map(publicProduct)));
+app.get("/api/agents",(req,res)=>res.json(db.prepare("SELECT id,name,messenger_url,whatsapp,active FROM agents WHERE active=1 ORDER BY id DESC").all().map(a=>({...a,whatsapp_url:a.whatsapp?(a.whatsapp.startsWith("http")?a.whatsapp:`https://wa.me/${a.whatsapp.replace(/\D/g,"")}`):""}))));
+app.post("/api/orders",(req,res)=>{const {customer_name,phone,email="",division="",district="",upazila="",address,note="",payment_method="Cash on Delivery",transaction_id="",items}=req.body;if(!customer_name||!phone||!address||!Array.isArray(items)||!items.length)return res.status(400).json({error:"Name, phone, address and cart items are required"});let total=0,clean=[];for(const i of items){const p=db.prepare("SELECT id,name,price,image FROM products WHERE id=?").get(Number(i.id));if(!p)continue;const qty=Math.max(1,Math.min(99,Number(i.qty)||1));clean.push({id:p.id,name:p.name,price:+p.price,qty,image:p.image});total+=+p.price*qty}if(!clean.length)return res.status(400).json({error:"No valid products"});const r=db.prepare(`INSERT INTO orders(customer_name,phone,email,division,district,upazila,address,note,items_json,total,payment_method,transaction_id) VALUES(?,?,?,?,?,?,?,?,?,?,?,?)`).run(customer_name.trim(),phone.trim(),email.trim(),division,district,upazila,address.trim(),note.trim(),JSON.stringify(clean),total,payment_method,String(transaction_id).trim());res.status(201).json({success:true,orderId:`FMF-${String(r.lastInsertRowid).padStart(6,"0")}`,total})});
+app.get("/api/orders/track",(req,res)=>{const phone=String(req.query.phone||"").trim(),id=String(req.query.id||"").replace(/\D/g,"");if(!phone||!id)return res.status(400).json({error:"Order ID and phone required"});const o=db.prepare("SELECT * FROM orders WHERE id=? AND phone=?").get(Number(id),phone);if(!o)return res.status(404).json({error:"Order not found"});res.json({...o,items:JSON.parse(o.items_json)})});
+app.post("/api/chat",async(req,res)=>{const message=String(req.body.message||"").trim();if(!message)return res.status(400).json({error:"Message required"});const catalog=db.prepare("SELECT id,name,price,category,tags,description FROM products ORDER BY id DESC LIMIT 80").all();if(!process.env.OPENAI_API_KEY)return res.json({reply:"AI assistant এখন demo mode-এ আছে। Product, price বা order জানতে চাইলে Shop section ব্যবহার করুন অথবা Contact with Agent চাপুন।"});try{const r=await fetch("https://api.openai.com/v1/responses",{method:"POST",headers:{"Content-Type":"application/json","Authorization":`Bearer ${process.env.OPENAI_API_KEY}`},body:JSON.stringify({model:process.env.OPENAI_MODEL||"gpt-4.1-mini",input:[{role:"system",content:`You are FM FASHION's shopping assistant. Use only this catalog. Never invent price, stock, policy or contact details. Be concise and helpful. Catalog: ${JSON.stringify(catalog)}`},{role:"user",content:message}]})});const j=await r.json();if(!r.ok)throw Error(j.error?.message||"AI failed");res.json({reply:j.output_text||"Sorry, I couldn't answer."})}catch(e){console.error(e);res.status(500).json({error:"AI service unavailable"})}});
+app.post("/api/admin/login",async(req,res)=>{const password=String(req.body.password||"");const stored=settings().admin_password_hash||"";const configured=process.env.ADMIN_PASSWORD||"";let ok=false;if(stored){ok=await bcrypt.compare(password,stored)}else{ok=!!configured&&password===configured;if(ok){const hash=await bcrypt.hash(password,12);db.prepare("UPDATE settings SET value=? WHERE key=?").run(hash,"admin_password_hash")}}if(!ok)return res.status(401).json({error:"Incorrect password"});const token=crypto.randomBytes(32).toString("hex");db.prepare("INSERT INTO sessions(token,expires_at) VALUES(?,?)").run(token,Date.now()+1000*60*60*12);res.cookie("admin_session",token,{signed:true,httpOnly:true,sameSite:"none",secure:true,maxAge:1000*60*60*12});res.json({success:true})});
+app.post("/api/admin/logout",admin,(req,res)=>{db.prepare("DELETE FROM sessions WHERE token=?").run(req.signedCookies.admin_session);res.clearCookie("admin_session");res.json({success:true})});
+app.get("/api/admin/me",admin,(req,res)=>res.json({authenticated:true}));
+app.put("/api/admin/password",admin,async(req,res)=>{const current=String(req.body.current_password||"");const next=String(req.body.new_password||"");if(next.length<6)return res.status(400).json({error:"New password must be at least 6 characters"});const s=settings();let ok=false;if(s.admin_password_hash)ok=await bcrypt.compare(current,s.admin_password_hash);else ok=!!process.env.ADMIN_PASSWORD&&current===process.env.ADMIN_PASSWORD;if(!ok)return res.status(401).json({error:"Current password is incorrect"});const hash=await bcrypt.hash(next,12);db.prepare("INSERT INTO settings(key,value) VALUES(?,?) ON CONFLICT(key) DO UPDATE SET value=excluded.value").run("admin_password_hash",hash);res.json({success:true})});
+app.get("/api/admin/products",admin,(req,res)=>res.json(db.prepare("SELECT * FROM products ORDER BY id DESC").all().map(publicProduct)));
+app.post("/api/admin/products",admin,upload.single("image"),(req,res)=>{const {name,price,old_price=0,category="General",description="",tags="",featured,is_new,image_url=""}=req.body;const image=req.file?`/uploads/${req.file.filename}`:String(image_url||"");if(!String(name||"").trim() || !Number.isFinite(+price) || +price<0)return res.status(400).json({error:"Product name and valid price are required"});
+const r=db.prepare("INSERT INTO products(name,description,price,old_price,image,category,tags,featured,is_new) VALUES(?,?,?,?,?,?,?,?,?)").run(String(name).trim(),description,+price,+old_price,image,category,tags,featured==="on"?1:0,is_new==="on"?1:0);res.json({success:true,id:r.lastInsertRowid})});
+app.put("/api/admin/products/:id",admin,upload.single("image"),(req,res)=>{const p=db.prepare("SELECT * FROM products WHERE id=?").get(Number(req.params.id));if(!p)return res.status(404).json({error:"Not found"});const {name,price,old_price=0,category="General",description="",tags="",featured,is_new}=req.body;const image=req.file?`/uploads/${req.file.filename}`:p.image;db.prepare("UPDATE products SET name=?,price=?,old_price=?,image=?,category=?,description=?,tags=?,featured=?,is_new=? WHERE id=?").run(name,+price,+old_price,image,category,description,tags,featured==="on"?1:0,is_new==="on"?1:0,p.id);res.json({success:true})});
+app.delete("/api/admin/products/:id",admin,(req,res)=>{db.prepare("DELETE FROM products WHERE id=?").run(Number(req.params.id));res.json({success:true})});
+app.get("/api/admin/orders",admin,(req,res)=>res.json(db.prepare("SELECT * FROM orders ORDER BY id DESC").all().map(o=>({...o,items:JSON.parse(o.items_json)}))));
+app.patch("/api/admin/orders/:id",admin,(req,res)=>{const allowed=["Pending","Confirmed","Processing","Shipped","Delivered","Cancelled"];const status=String(req.body.status);if(!allowed.includes(status))return res.status(400).json({error:"Invalid status"});db.prepare("UPDATE orders SET status=? WHERE id=?").run(status,Number(req.params.id));res.json({success:true})});
+app.get("/api/admin/agents",admin,(req,res)=>res.json(db.prepare("SELECT * FROM agents ORDER BY id DESC").all()));
+app.post("/api/admin/agents",admin,(req,res)=>{const {name,whatsapp,messenger_url="",active="on"}=req.body;const r=db.prepare("INSERT INTO agents(name,whatsapp,messenger_url,active) VALUES(?,?,?,?)").run(name,whatsapp,messenger_url,active==="on"?1:0);res.json({success:true,id:r.lastInsertRowid})});
+app.put("/api/admin/agents/:id",admin,(req,res)=>{const {name,whatsapp,messenger_url="",active}=req.body;db.prepare("UPDATE agents SET name=?,whatsapp=?,messenger_url=?,active=? WHERE id=?").run(name,whatsapp,messenger_url,active==="on"?1:0,Number(req.params.id));res.json({success:true})});
+app.delete("/api/admin/agents/:id",admin,(req,res)=>{db.prepare("DELETE FROM agents WHERE id=?").run(Number(req.params.id));res.json({success:true})});
+app.get("/api/admin/settings",admin,(req,res)=>res.json(settings()));
+app.put("/api/admin/settings",admin,(req,res)=>{const body=req.body;for(const [k,v] of Object.entries(body)){if(k==="payment_methods")continue;db.prepare("INSERT INTO settings(key,value) VALUES(?,?) ON CONFLICT(key) DO UPDATE SET value=excluded.value").run(k,typeof v==="boolean"?(v?"1":"0"):String(v??""))}res.json({settings:{...settings(),payment_methods:paymentMethods()}})});
+app.get("/api/admin/dashboard",admin,(req,res)=>{const revenue=db.prepare("SELECT COALESCE(SUM(total),0) t FROM orders WHERE status!='Cancelled'").get().t;const orders=db.prepare("SELECT COUNT(*) c FROM orders").get().c;const products=db.prepare("SELECT COUNT(*) c FROM products").get().c;const agents=db.prepare("SELECT COUNT(*) c FROM agents WHERE active=1").get().c;res.json({revenue,orders,products,agents})});
+app.post("/api/admin/ai-product",admin,upload.single("image"),async(req,res)=>{if(!req.file)return res.status(400).json({error:"Image required"});const price=+req.body.price;if(!price)return res.status(400).json({error:"Price required"});let suggestion={name:"Premium Fashion Product",description:"Premium quality fashion product from FM FASHION.",category:"Fashion",tags:"fashion,premium,new"};if(process.env.OPENAI_API_KEY){try{const b=fs.readFileSync(req.file.path).toString("base64");const r=await fetch("https://api.openai.com/v1/responses",{method:"POST",headers:{"Content-Type":"application/json","Authorization":`Bearer ${process.env.OPENAI_API_KEY}`},body:JSON.stringify({model:process.env.OPENAI_VISION_MODEL||"gpt-4.1-mini",input:[{role:"user",content:[{type:"input_text",text:"Identify this fashion product. Return ONLY JSON with name, description, category, tags."},{type:"input_image",image_url:`data:${req.file.mimetype};base64,${b}`}]}]})});const j=await r.json();if(r.ok){try{suggestion=JSON.parse(j.output_text)}catch{}}}catch(e){console.error(e)}}
+const image=`/uploads/${req.file.filename}`;res.json({preview:{...suggestion,price,image}})});
+const port=process.env.PORT||10000;app.listen(port,()=>console.log(`FM FASHION API running on ${port}`));
