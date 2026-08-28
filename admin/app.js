@@ -1065,14 +1065,14 @@ async function loginUser() {
   const password = passwordInput ? passwordInput.value.trim() : "";
 
   if (!password) {
-    if (errorBox) errorBox.textContent = "দয়া করে পাসওয়ার্ড দিন।";
+    if (errorBox) errorBox.textContent = "দয়া করে পাসওয়ার্ড দিন";
     return;
   }
 
   if (errorBox) errorBox.textContent = "Signing in...";
 
   try {
-    const response = await fetch("/api/admin/login", {
+    const response = await fetch("/admin/login", {
       method: "POST",
       headers: {
         "Content-Type": "application/json"
@@ -1094,15 +1094,14 @@ async function loginUser() {
     if (appSection) appSection.hidden = false;
     if (errorBox) errorBox.textContent = "";
 
-    // ডেটা লোড করা
+    // ডাটা লোড করা
     if (typeof loadAll === "function") {
       await loadAll();
     }
-    
+
     if (typeof toast === "function") {
       toast("Login successful");
     }
-
   } catch (error) {
     console.error("LOGIN ERROR:", error);
     if (errorBox) {
@@ -1110,25 +1109,4 @@ async function loginUser() {
     }
   }
 }
-
-// অটো সেশন চেক ও পেজ লোড
-window.addEventListener("DOMContentLoaded", async () => {
-  if (typeof setupTabs === "function") setupTabs();
-  if (typeof setupModals === "function") setupModals();
-
-  try {
-    const res = await fetch("/api/admin/me");
-    if (res.ok) {
-      const loginSection = document.getElementById("login");
-      const appSection = document.getElementById("app");
-      if (loginSection) loginSection.hidden = true;
-      if (appSection) appSection.hidden = false;
-      if (typeof loadAll === "function") {
-        await loadAll();
-      }
-    }
-  } catch (e) {
-    console.log("Not logged in yet");
-  }
-});
   
