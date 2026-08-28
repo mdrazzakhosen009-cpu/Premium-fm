@@ -1349,159 +1349,59 @@ function setupModals() {
 // LOAD EVERYTHING
 // ==========================================
 
-async function loadAll() {
+async function login(event) {
+  event.preventDefault();
+
+  const password = $("#password")?.value.trim();
+
+  if (!password) {
+    $("#loginError").textContent = "Password দিন।";
+    return;
+  }
+
+  $("#loginError").textContent = "Signing in...";
 
   try {
+    // Login
+    await api("/api/admin/login", {
+      method: "POST",
+      headers: {
+        "Content-Type": "application/json"
+      },
+      body: JSON.stringify({
+        password
+      })
+    });
 
-    await Promise.all([
-      loadDashboard(),
-      loadProducts(),
-      loadOrders(),
-      loadAgents(),
-      loadSettings()
-    ]);
+    // Verify session
+    await api("/api/admin/me");
 
-    setupStoreLink();
+    // Open dashboard immediately
+    $("#login").hidden = true;
+    $("#app").hidden = false;
+
+    $("#loginError").textContent = "";
+
+    // Load dashboard
+    try {
+      await loadAll();
+      toast("Login successful");
+    } catch (loadError) {
+      console.error("DASHBOARD LOAD ERROR:", loadError);
+
+      toast(
+        "Login successful, but dashboard data load failed: " +
+        loadError.message
+      );
+    }
 
   } catch (error) {
+    console.error("LOGIN ERROR:", error);
 
-    console.error(
-      "LOAD ALL ERROR:",
-      error
-    );
+    $("#login").hidden = false;
+    $("#app").hidden = true;
 
-    toast(
-      "Dashboard load error: " +
-      error.message
-    );
-
-    throw error;
+    $("#loginError").textContent =
+      error.message || "Login failed";
   }
 }
-
-// ==========================================
-// STORE LINK
-// ==========================================
-
-function setupStoreLink() {
-
-  if ($("#storeLink")) {
-    $("#storeLink").href =
-      "/";
-  }
-}
-
-// ==========================================
-// EVENTS
-// ==========================================
-
-document.addEventListener(
-  "DOMContentLoaded",
-  async () => {
-
-    setupTabs();
-    setupModals();
-
-    const loginForm =
-      $("#loginForm");
-
-    if (loginForm) {
-      loginForm.addEventListener(
-        "submit",
-        login
-      );
-    }
-
-    const logoutButton =
-      $("#logout");
-
-    if (logoutButton) {
-      logoutButton.addEventListener(
-        "click",
-        logout
-      );
-    }
-
-    const refreshButton =
-      $("#refresh");
-
-    if (refreshButton) {
-      refreshButton.addEventListener(
-        "click",
-        async () => {
-
-          try {
-            await loadAll();
-            toast(
-              "Dashboard refreshed"
-            );
-          } catch (error) {
-            toast(
-              error.message
-            );
-          }
-
-        }
-      );
-    }
-
-    const productForm =
-      $("#productForm");
-
-    if (productForm) {
-      productForm.addEventListener(
-        "submit",
-        saveProduct
-      );
-    }
-
-    const agentForm =
-      $("#agentForm");
-
-    if (agentForm) {
-      agentForm.addEventListener(
-        "submit",
-        saveAgent
-      );
-    }
-
-    const settingsForm =
-      $("#settingsForm");
-
-    if (settingsForm) {
-      settingsForm.addEventListener(
-        "submit",
-        saveSettings
-      );
-    }
-
-    const aiForm =
-      $("#aiForm");
-
-    if (aiForm) {
-      aiForm.addEventListener(
-        "submit",
-        analyzeAIProduct
-      );
-    }
-
-    // Check existing session
-    try {
-
-      await api(
-        "/api/admin/me"
-      );
-
-      $("#login").hidden = true;
-      $("#app").hidden = false;
-
-      await loadAll();
-
-    } catch (error) {
-
-      $("#login").hidden = false;
-      $("#app").hidden = true;
-
-    }
-  }
-);
