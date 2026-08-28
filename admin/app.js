@@ -1077,4 +1077,431 @@ async function saveSettings(event) {
     renderSettings();
 
     if ($("#saved")) {
-      $("#saved").textConte
+      $("#saved").textContent =
+        " Saved successfully";
+    }
+
+    toast(
+      "Settings synced to store"
+    );
+
+    setTimeout(() => {
+      if ($("#saved")) {
+        $("#saved").textContent =
+          "";
+      }
+    }, 2500);
+
+  } catch (error) {
+    toast(error.message);
+  }
+}
+
+// ==========================================
+// AI PRODUCT
+// ==========================================
+
+async function analyzeAIProduct(event) {
+  event.preventDefault();
+
+  const form =
+    event.target;
+
+  const data =
+    new FormData(form);
+
+  try {
+
+    const result =
+      await api(
+        "/api/admin/ai-product",
+        {
+          method: "POST",
+          body: data
+        }
+      );
+
+    renderAIResult(
+      result.preview
+    );
+
+    toast(
+      "AI product analyzed"
+    );
+
+  } catch (error) {
+    toast(error.message);
+  }
+}
+
+function renderAIResult(product) {
+  const box =
+    $("#aiResult");
+
+  if (!box) return;
+
+  box.innerHTML = `
+    <div class="ai-preview">
+
+      <h3>AI Preview</h3>
+
+      <img
+        src="${esc(
+          imageUrl(product.image)
+        )}"
+        style="
+          width:180px;
+          height:180px;
+          object-fit:cover;
+          border-radius:14px;
+        "
+      >
+
+      <p>
+        <b>Name:</b>
+        ${esc(product.name)}
+      </p>
+
+      <p>
+        <b>Price:</b>
+        ${money(product.price)}
+      </p>
+
+      <p>
+        <b>Category:</b>
+        ${esc(product.category)}
+      </p>
+
+      <p>
+        <b>Description:</b>
+        ${esc(product.description)}
+      </p>
+
+      <p>
+        <b>Tags:</b>
+        ${esc(product.tags)}
+      </p>
+
+      <button
+        class="gold"
+        id="publishAI"
+      >
+        Publish Product
+      </button>
+
+    </div>
+  `;
+
+  $("#publishAI").onclick =
+    async () => {
+
+      try {
+
+        const formData =
+          new FormData();
+
+        formData.append(
+          "name",
+          product.name
+        );
+
+        formData.append(
+          "price",
+          product.price
+        );
+
+        formData.append(
+          "old_price",
+          0
+        );
+
+        formData.append(
+          "category",
+          product.category
+        );
+
+        formData.append(
+          "description",
+          product.description
+        );
+
+        formData.append(
+          "tags",
+          product.tags
+        );
+
+        formData.append(
+          "image_url",
+          product.image
+        );
+
+        await api(
+          "/api/admin/products",
+          {
+            method: "POST",
+            body: formData
+          }
+        );
+
+        await loadAll();
+
+        box.innerHTML =
+          "<p>Product published successfully.</p>";
+
+        toast(
+          "AI product published"
+        );
+
+      } catch (error) {
+        toast(error.message);
+      }
+    };
+}
+
+// ==========================================
+// MODALS
+// ==========================================
+
+function setupModals() {
+
+  document
+    .querySelectorAll("[data-close]")
+    .forEach((button) => {
+
+      button.onclick = () => {
+
+        const overlay =
+          button.closest(".overlay");
+
+        if (overlay) {
+          overlay.classList.remove(
+            "open"
+          );
+        }
+      };
+    });
+
+  document
+    .querySelectorAll(".overlay")
+    .forEach((overlay) => {
+
+      overlay.addEventListener(
+        "click",
+        (event) => {
+
+          if (
+            event.target === overlay
+          ) {
+            overlay.classList.remove(
+              "open"
+            );
+          }
+        }
+      );
+    });
+
+  if ($("#newProduct")) {
+    $("#newProduct").onclick =
+      () => {
+
+        const form =
+          $("#productForm");
+
+        form.reset();
+
+        if (form.elements.id) {
+          form.elements.id.value =
+            "";
+        }
+
+        $("#pTitle").textContent =
+          "Add Product";
+
+        $("#productModal")
+          .classList.add("open");
+      };
+  }
+
+  if ($("#newAgent")) {
+    $("#newAgent").onclick =
+      () => {
+
+        const form =
+          $("#agentForm");
+
+        form.reset();
+
+        if (form.elements.id) {
+          form.elements.id.value =
+            "";
+        }
+
+        form.elements.active.checked =
+          true;
+
+        $("#agentModal")
+          .classList.add("open");
+      };
+  }
+}
+
+// ==========================================
+// LOAD EVERYTHING
+// ==========================================
+
+async function loadAll() {
+
+  try {
+
+    await Promise.all([
+      loadDashboard(),
+      loadProducts(),
+      loadOrders(),
+      loadAgents(),
+      loadSettings()
+    ]);
+
+    setupStoreLink();
+
+  } catch (error) {
+
+    console.error(
+      "LOAD ALL ERROR:",
+      error
+    );
+
+    toast(
+      "Dashboard load error: " +
+      error.message
+    );
+
+    throw error;
+  }
+}
+
+// ==========================================
+// STORE LINK
+// ==========================================
+
+function setupStoreLink() {
+
+  if ($("#storeLink")) {
+    $("#storeLink").href =
+      "/";
+  }
+}
+
+// ==========================================
+// EVENTS
+// ==========================================
+
+document.addEventListener(
+  "DOMContentLoaded",
+  async () => {
+
+    setupTabs();
+    setupModals();
+
+    const loginForm =
+      $("#loginForm");
+
+    if (loginForm) {
+      loginForm.addEventListener(
+        "submit",
+        login
+      );
+    }
+
+    const logoutButton =
+      $("#logout");
+
+    if (logoutButton) {
+      logoutButton.addEventListener(
+        "click",
+        logout
+      );
+    }
+
+    const refreshButton =
+      $("#refresh");
+
+    if (refreshButton) {
+      refreshButton.addEventListener(
+        "click",
+        async () => {
+
+          try {
+            await loadAll();
+            toast(
+              "Dashboard refreshed"
+            );
+          } catch (error) {
+            toast(
+              error.message
+            );
+          }
+
+        }
+      );
+    }
+
+    const productForm =
+      $("#productForm");
+
+    if (productForm) {
+      productForm.addEventListener(
+        "submit",
+        saveProduct
+      );
+    }
+
+    const agentForm =
+      $("#agentForm");
+
+    if (agentForm) {
+      agentForm.addEventListener(
+        "submit",
+        saveAgent
+      );
+    }
+
+    const settingsForm =
+      $("#settingsForm");
+
+    if (settingsForm) {
+      settingsForm.addEventListener(
+        "submit",
+        saveSettings
+      );
+    }
+
+    const aiForm =
+      $("#aiForm");
+
+    if (aiForm) {
+      aiForm.addEventListener(
+        "submit",
+        analyzeAIProduct
+      );
+    }
+
+    // Check existing session
+    try {
+
+      await api(
+        "/api/admin/me"
+      );
+
+      $("#login").hidden = true;
+      $("#app").hidden = false;
+
+      await loadAll();
+
+    } catch (error) {
+
+      $("#login").hidden = false;
+      $("#app").hidden = true;
+
+    }
+  }
+);
