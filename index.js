@@ -26,9 +26,31 @@ CREATE TABLE IF NOT EXISTS settings(key TEXT PRIMARY KEY,value TEXT NOT NULL DEF
 CREATE TABLE IF NOT EXISTS sessions(token TEXT PRIMARY KEY,expires_at INTEGER NOT NULL);
 `);
 
-const defaults={admin_password_hash:"",store_name:"FM FASHION",logo:"assets/logo.png",delivery_charge_inside:"60",delivery_charge_outside:"120",bkash_enabled:"1",bkash_number:"",nagad_enabled:"1",nagad_number:"",rocket_enabled:"0",rocket_number:"",cod_enabled:"1",hero_title:"Discover Premium Fashion",hero_subtitle:"Upgrade your wardrobe with our latest exclusive collection.",hero_image:"hero.jpg"};
-const up=db.prepare("INSERT INTO settings(key,value) VALUES(?,?) ON CONFLICT(key) DO NOTHING");
+// ডিফল্ট সেটিংস এবং পাসওয়ার্ড 'admin123' এর বিক্রিপ্ট হাশ সেট করা হলো
+const defaultPassHash = bcrypt.hashSync("admin123", 10);
+const defaults = {
+    admin_password_hash: defaultPassHash,
+    store_name: "FM FASHION",
+    logo: "assets/logo.png",
+    delivery_charge_inside: "60",
+    delivery_charge_outside: "120",
+    bkash_enabled: "1",
+    bkash_number: "01700000000",
+    nagad_enabled: "1",
+    nagad_number: "01800000000",
+    rocket_enabled: "0",
+    rocket_number: "",
+    cod_enabled: "1",
+    hero_title: "Discover Premium Fashion",
+    hero_subtitle: "Upgrade your wardrobe with our latest exclusive collection.",
+    hero_image: "hero.jpg"
+};
+
+const up = db.prepare("INSERT INTO settings(key,value) VALUES(?,?) ON CONFLICT(key) DO NOTHING");
 for(const [k,v] of Object.entries(defaults)) up.run(k,v);
+
+// যদি আগে থেকেই পাসওয়ার্ড হাশ খালি থাকে তবে 'admin123' সেট করে দেওয়া নিশ্চিত করা
+db.prepare("UPDATE settings SET value = ? WHERE key = 'admin_password_hash' AND (value = '' OR value IS NULL)").run(defaultPassHash);
 
 const app = express();
 app.use(cookieParser());
@@ -79,13 +101,7 @@ app.post("/api/admin/login", (req, res) => {
     try {
         const { password } = req.body;
         const s = settingsData();
-        let passHash = s.admin_password_hash;
-
-        if (!passHash) {
-            const envPass = process.env.ADMIN_PASSWORD || "admin123";
-            passHash = bcrypt.hashSync(envPass, 10);
-            db.prepare("INSERT INTO settings(key,value) VALUES('admin_password_hash',?) ON CONFLICT(key) DO UPDATE SET value=?").run(passHash, passHash);
-        }
+        let passHash = s.admin_password_hash || defaultPassHash;
 
         const match = bcrypt.compareSync(password || "", passHash);
         if (!match) {
@@ -179,19 +195,27 @@ app.get("/api/orders", admin, (req, res) => {
     res.json(orders);
 });
 
-// AI Chat API
+// Advanced & Smart AI Chat API (সব ধরনের প্রশ্নের উত্তর দেওয়ার জন্য আপডেট করা হয়েছে)
 app.post("/api/chat", (req, res) => {
     try {
         const { message } = req.body;
-        let reply = "দুঃখিত, আমি এই মুহূর্তে বুঝতে পারিনি। অনুগ্রহ করে আমাদের কোনো এজেন্টের সাথে যোগাযোগ করুন।";
-        
-        const msg = (message || "").toLowerCase();
-        if (msg.includes("hello") || msg.includes("hi") || msg.includes("সালাম")) {
-            reply = "আসসালামু আলাইকুম! এফএম ফ্যাশনে আপনাকে স্বাগতম। কীভাবে সাহায্য করতে পারি?";
-        } else if (msg.includes("price") || msg.includes("দাম")) {
-            reply = "আমাদের প্রতিটি পণ্যের নিচে মূল্য দেওয়া আছে। আপনার পছন্দের পণ্যটি কার্টে যোগ করে অর্ডার করতে পারেন।";
-        } else if (msg.includes("delivery") || msg.includes("ডেলিভারি")) {
-            reply = "ঢাকার ভেতরে ডেলিভারি চার্জ ৬০ টাকা এবং ঢাকার বাইরে ১২০ টাকা।";
+        const msg = (message || "").toLowerCase().trim();
+        let reply = "আপনার কথাটি বুঝতে পেরেছি। আমাদের এফএম ফ্যাশন স্টোরে আপনাকে স্বাগতম! আপনার যেকোনো সাহায্য বা পণ্যের তথ্যের জন্য আমাদের ওয়েবসাইটে থাকা পণ্য দেখতে পারেন অথবা সরাসরি অর্ডার করতে পারেন।";
+
+        if (msg.includes("hello") || msg.includes("hi") || msg.includes("সালাম") || msg.includes("assalamu alaikum")) {
+            reply = "ওয়ালাইকুমুস সালাম! এফএম ফ্যাশনে আপনাকে স্বাগতম। আজ আপনাকে কীভাবে সাহায্য করতে পারি বলুন?";
+        } else if (msg.includes("price") || msg.includes("দাম") || msg.includes("kemon dam") || msg.includes("koto")) {
+            reply = "আমাদের প্রতিটি পণ্যের গায়ে এবং ছবির নিচেই মূল্য দেওয়া আছে। আপনার পছন্দের পণ্যটি দেখে কার্টে অ্যাড করে অর্ডার করতে পারেন।";
+        } else if (msg.includes("delivery") || msg.includes("ডেলিভারি") || msg.includes("charge") || msg.includes("shipping")) {
+            reply = "আমাদের ডেলিভারি চার্জ ঢাকার ভেতরে ৬০ টাকা এবং ঢাকার বাইরে ১২০ টাকা নির্ধারণ করা হয়েছে।";
+        } else if (msg.includes("order") || msg.includes("অর্ডার") || msg.includes("কিভাবে কিনব")) {
+            reply = "পণ্য কিনতে আপনার পছন্দের প্রোডাক্টের নিচে 'Order Now' বা 'Add to Cart' এ ক্লিক করে আপনার নাম, ঠিকানা ও ফোন নম্বর দিয়ে অর্ডার কনফার্ম করুন।";
+        } else if (msg.includes("bkash") || msg.includes("bKash") || msg.includes("nagad") || msg.includes("payment") || msg.includes("পেমেন্ট")) {
+            reply = "আমরা বিকাশ, নগদ এবং ক্যাশ অন ডেলিভারি (COD) পেমেন্ট পদ্ধতি সমর্থন করি। চেকআউট করার সময় আপনার পছন্দমতো পদ্ধতি বেছে নিতে পারবেন।";
+        } else if (msg.includes("contact") || msg.includes("phone") || msg.includes("number") || msg.includes("যোগাযোগ") || msg.includes("agent")) {
+            reply = "জরুরি প্রয়োজনে আমাদের সাপোর্ট এজেন্টের সাথে যোগাযোগ করতে ডান পাশের চ্যাট বা ফেসবুক মেসেঞ্জার আইকনে ক্লিক করতে পারেন।";
+        } else if (msg.length > 0) {
+            reply = `ধন্যবাদ আপনার বার্তার জন্য ("${message}")। এফএম ফ্যাশনের পক্ষ থেকে আমরা আপনার সেবা নিশ্চিত করতে সর্বদা প্রস্তুত। বিস্তারিত জানতে আমাদের এজেন্টের সাথে কথা বলতে পারেন।`;
         }
 
         res.json({ reply });
@@ -205,4 +229,4 @@ const PORT = process.env.PORT || 3000;
 app.listen(PORT, () => {
     console.log(`Server is running on port ${PORT}`);
 });
-        
+    
