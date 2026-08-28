@@ -11,8 +11,7 @@ import { fileURLToPath } from "url";
 
 dotenv.config();
 
-// সবার আগে app ইনিশিয়ালাইজ করতে হবে
-const app = express(); 
+const app = express();
 
 const __filename = fileURLToPath(import.meta.url);
 const __dirname = path.dirname(__filename);
@@ -77,7 +76,9 @@ function admin(req,res,next){
     next();
 }
 
-// Admin Login Route
+// ---------------- API ROUTES ----------------
+
+// Admin Login
 app.post("/api/admin/login", (req, res) => {
     try {
         const { password } = req.body;
@@ -126,8 +127,85 @@ app.post("/api/admin/logout", (req, res) => {
     res.json({ success: true });
 });
 
+// Products API
+app.get("/api/products", (req, res) => {
+    const products = db.prepare("SELECT * FROM products ORDER BY id DESC").all();
+    res.json(products);
+});
+
+app.post("/api/products", admin, upload.single("image"), (req, res) => {
+    const { name, price, old_price, category, stock, featured } = req.body;
+    const image = req.file ? `/uploads/${req.file.filename}` : "";
+    const stmt = db.prepare("INSERT INTO products (name, price, old_price, image, category, stock, featured) VALUES (?, ?, ?, ?, ?, ?, ?)");
+    const info = stmt.run(name, price, old_price || null, image, category || "", stock || 0, featured ? 1 : 0);
+    res.json({ id: info.lastInsertRowid, success: true });
+});
+
+app.delete("/api/products/:id", admin, (req, res) => {
+    db.prepare("DELETE FROM products WHERE id=?").run(req.params.id);
+    res.json({ success: true });
+});
+
+// Settings API
+app.get("/api/settings", (req, res) => {
+    const s = settingsData();
+    res.json({
+        store_name: s.store_name,
+        logo: s.logo,
+        hero_title: s.hero_title,
+        hero_subtitle: s.hero_subtitle,
+        hero_image: s.hero_image,
+        payment_methods: {
+            bKash: { enabled: s.bkash_enabled === "1", number: s.bkash_number },
+            Nagad: { enabled: s.nagad_enabled === "1", number: s.nagad_number },
+            Rocket: { enabled: s.rocket_enabled === "1", number: s.rocket_number },
+            COD: { enabled: s.cod_enabled === "1", number: "" }
+        }
+    });
+});
+
+// Agents API
+app.get("/api/agents", (req, res) => {
+    const agents = db.prepare("SELECT * FROM agents").all();
+    res.json(agents);
+});
+
+// Orders API
+app.post("/api/orders", (req, res) => {
+    const { name, phone, email, division, district, upazila, address, items, total } = req.body;
+    const stmt = db.prepare("INSERT INTO orders (customer_name, phone, email, division, district, upazila, address, items, total_amount, delivery_charge) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?)");
+    const info = stmt.run(name || "Customer", phone || "", email || "", division || "", district || "", upazila || "", address || "", JSON.stringify(items || []), total || 0, 60);
+    res.json({ orderId: info.lastInsertRowid, total });
+});
+
+app.get("/api/orders", admin, (req, res) => {
+    const orders = db.prepare("SELECT * FROM orders ORDER BY id DESC").all();
+    res.json(orders);
+});
+
+// AI Chat API
+app.post("/api/chat", (req, res) => {
+    try {
+        const { message } = req.body;
+        let reply = "দুঃখিত, আমি এই মুহূর্তে বুঝতে পারিনি। অনুগ্রহ করে আমাদের কোনো এজেন্টের সাথে যোগাযোগ করুন।";
+        
+        const msg = (message || "").toLowerCase();
+        if (msg.includes("hello") || msg.includes("hi") || msg.includes("সালাম")) {
+            reply = "আসসালামু আলাইকুম! এফএম ফ্যাশনে আপনাকে স্বাগতম। কীভাবে সাহায্য করতে পারি?";
+        } else if (msg.includes("price") || msg.includes("দাম")) {
+            reply = "আমাদের প্রতিটি পণ্যের নিচে মূল্য দেওয়া আছে। আপনার পছন্দের পণ্যটি কার্টে যোগ করে অর্ডার করতে পারেন।";
+        } else if (msg.includes("delivery") || msg.includes("ডেলিভারি")) {
+            reply = "ঢাকার ভেতরে ডেলিভারি চার্জ ৬০ টাকা এবং ঢাকার বাইরে ১২০ টাকা।";
+        }
+
+        res.json({ reply });
+    } catch (err) {
+        console.error(err);
+        res.status(500).json({ error: "Chat service error" });
+    }
+});
+
 const PORT = process.env.PORT || 3000;
 app.listen(PORT, () => {
     console.log(`Server is running on port ${PORT}`);
 });
-        
