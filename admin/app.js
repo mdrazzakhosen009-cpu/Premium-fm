@@ -1051,33 +1051,114 @@ async function saveSettings(event) {
       form.elements.cod_enabled.checked
   };
 
+  // ==========================================
+// LOGIN (Fixed & Direct)
+// ==========================================
+
+async function login(event) {
+  event.preventDefault();
+
+  const password = $("#password")?.value.trim();
+
+  if (!password) {
+    $("#loginError").textContent = "Password দিন।";
+    return;
+  }
+
+  $("#loginError").textContent = "Signing in...";
+
   try {
+    await api("/api/admin/login", {
+      method: "POST",
+      headers: {
+        "Content-Type": "application/json"
+      },
+      body: JSON.stringify({ password })
+    });
 
-    const result =
-      await api(
-        "/api/admin/settings",
-        {
-          method: "PUT",
+    // সরাসরি লগইন সফল হলে ড্যাশবোর্ড ওপেন করে দেব
+    $("#login").hidden = true;
+    $("#app").hidden = false;
+    $("#loginError").textContent = "";
 
-          headers: {
-            "Content-Type":
-              "application/json"
-          },
-
-          body:
-            JSON.stringify(data)
-        }
-      );
-
-    state.settings =
-      result.settings ||
-      state.settings;
-
-    renderSettings();
-
-    if ($("#saved")) {
-      $("#saved").textContent =
-        " Saved successfully";
+    try {
+      await loadAll();
+      toast("Login successful");
+    } catch (loadError) {
+      console.error("DASHBOARD LOAD ERROR:", loadError);
+      toast("Login successful, but some data failed to load.");
     }
 
-    
+  } catch (error) {
+    console.error("LOGIN ERROR:", error);
+
+    $("#login").hidden = false;
+    $("#app").hidden = true;
+
+    $("#loginError").textContent =
+      error.message || "Login failed";
+  }
+}
+
+// ==========================================
+// LOAD ALL & INITIALIZATION
+// ==========================================
+
+async function loadAll() {
+  await Promise.all([
+    loadDashboard(),
+    loadProducts(),
+    loadOrders(),
+    loadAgents(),
+    loadSettings()
+  ]);
+}
+
+window.addEventListener("DOMContentLoaded", async () => {
+  setupTabs();
+  setupModals();
+
+  const loginForm = $("#loginForm") || $("#login")?.querySelector("form");
+  if (loginForm) {
+    loginForm.onsubmit = login;
+  }
+
+  const productForm = $("#productForm");
+  if (productForm) {
+    productForm.onsubmit = saveProduct;
+  }
+
+  const agentForm = $("#agentForm");
+  if (agentForm) {
+    agentForm.onsubmit = saveAgent;
+  }
+
+  const settingsForm = $("#settingsForm");
+  if (settingsForm) {
+    settingsForm.onsubmit = saveSettings;
+  }
+
+  const aiForm = $("#aiForm");
+  if (aiForm) {
+    aiForm.onsubmit = analyzeAIProduct;
+  }
+
+  const logoutBtn = $("#logoutBtn");
+  if (logoutBtn) {
+    logoutBtn.onclick = logout;
+  }
+
+  // অটো সেশন চেক (যদি অলরেডি কুকি থাকে)
+  try {
+    const me = await api("/api/admin/me");
+    if (me) {
+      $("#login").hidden = true;
+      $("#app").hidden = false;
+      await loadAll();
+    }
+  } catch (e) {
+    $("#login").hidden = false;
+    $("#app").hidden = true;
+  }
+});
+  
