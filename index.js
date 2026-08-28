@@ -92,8 +92,6 @@ function admin(req, res, next) {
     next();
 }
 
-// ---------------- API ROUTES ----------------
-
 app.post("/api/admin/login", (req, res) => {
     try {
         const { password } = req.body;
@@ -219,4 +217,3 @@ const PORT = process.env.PORT || 3000;
 app.listen(PORT, () => {
     console.log(`Server is running on port ${PORT}`);
 });
-         
