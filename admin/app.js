@@ -1,202 +1,110 @@
-// ===============================
-// FM FASHION - ADMIN APP.JS
-// ===============================
+// ==========================================
+// FM FASHION - ADMIN APP
+// Complete copy-paste ready
+// ==========================================
 
-// Same-origin deployment.
-// Admin panel এবং server একই domain-এ থাকলে API_BASE ফাঁকা থাকবে।
 window.API_BASE = "";
 
 const API = "";
 
-const $ = (s) => document.querySelector(s);
+const $ = (selector) =>
+  document.querySelector(selector);
 
-const money = (n) =>
-  "৳" + Number(n || 0).toLocaleString("en-BD");
+const money = (value) =>
+  "৳" +
+  Number(value || 0).toLocaleString("en-BD");
 
-const esc = (s) =>
-  String(s ?? "").replace(/[&<>"']/g, (c) => ({
-    "&": "&amp;",
-    "<": "&lt;",
-    ">": "&gt;",
-    '"': "&quot;",
-    "'": "&#039;"
-  }[c]));
+const esc = (value) =>
+  String(value ?? "").replace(
+    /[&<>"']/g,
+    (char) =>
+      ({
+        "&": "&amp;",
+        "<": "&lt;",
+        ">": "&gt;",
+        '"': "&quot;",
+        "'": "&#039;"
+      })[char]
+  );
 
 let state = {
   products: [],
   orders: [],
   agents: [],
-  settings: {}
+  settings: {},
+  dashboard: {}
 };
 
+// ==========================================
+// API
+// ==========================================
 
-// ===============================
-// API HELPER
-// ===============================
+async function api(path, options = {}) {
+  const opts = {
+    ...options,
+    credentials: "include"
+  };
 
-async function api(path, opt = {}) {
+  const response = await fetch(API + path, opts);
 
-  opt.credentials = "include";
+  const data = await response
+    .json()
+    .catch(() => ({}));
 
-  const r = await fetch(API + path, opt);
-
-  const j = await r.json().catch(() => ({}));
-
-  if (!r.ok) {
-    throw Error(
-      j.error || `Request failed (${r.status})`
+  if (!response.ok) {
+    throw new Error(
+      data.error ||
+        `Request failed (${response.status})`
     );
   }
 
-  return j;
+  return data;
 }
 
-
-// ===============================
+// ==========================================
 // TOAST
-// ===============================
+// ==========================================
 
-function toast(msg) {
+function toast(message) {
+  let element =
+    document.getElementById("adminToast");
 
-  let el = document.getElementById("adminToast");
+  if (!element) {
+    element =
+      document.createElement("div");
 
-  if (!el) {
+    element.id = "adminToast";
 
-    el = document.createElement("div");
-
-    el.id = "adminToast";
-
-    el.style.cssText =
-      "position:fixed;right:18px;bottom:18px;z-index:9999;" +
-      "background:#111;color:#fff;padding:12px 16px;" +
-      "border-radius:12px;box-shadow:0 10px 30px #0004";
-
-    document.body.appendChild(el);
+    element.style.cssText =
+      "position:fixed;" +
+      "right:18px;" +
+      "bottom:18px;" +
+      "z-index:99999;" +
+      "background:#111;" +
+      "color:#fff;" +
+      "padding:12px 16px;" +
+      "border-radius:12px;" +
+      "box-shadow:0 10px 30px #0004;" +
+      "font-size:14px;";
+      
+    document.body.appendChild(element);
   }
 
-  el.textContent = msg;
-  el.hidden = false;
+  element.textContent = message;
+  element.hidden = false;
 
-  clearTimeout(el._t);
+  clearTimeout(element._timer);
 
-  el._t = setTimeout(() => {
-    el.hidden = true;
-  }, 2500);
+  element._timer = setTimeout(() => {
+    element.hidden = true;
+  }, 3000);
 }
 
-
-// ===============================
-// FORM HELPER
-// ===============================
-
-function formDataObject(form) {
-  return Object.fromEntries(new FormData(form));
-}
-
-
-// ===============================
-// TABS
-// ===============================
-
-function setupTabs() {
-
-  document.querySelectorAll(".tab").forEach((b) => {
-
-    b.onclick = () => {
-
-      document.querySelectorAll(".tab")
-        .forEach((x) =>
-          x.classList.toggle("active", x === b)
-        );
-
-      document.querySelectorAll(".panel")
-        .forEach((x) =>
-          x.classList.toggle(
-            "active",
-            x.id === b.dataset.tab
-          )
-        );
-    };
-
-  });
-}
-
-
-// ===============================
-// LOGIN
-// ===============================
-
-async function login(e) {
-
-  e.preventDefault();
-
-  const password =
-    $("#password").value.trim();
-
-  if (!password) {
-    $("#loginError").textContent =
-      "Password দিন।";
-    return;
-  }
-
-  try {
-
-    await api("/api/admin/login", {
-
-      method: "POST",
-
-      headers: {
-        "Content-Type": "application/json"
-      },
-
-      body: JSON.stringify({
-        password
-      })
-
-    });
-
-    $("#login").hidden = true;
-
-    $("#app").hidden = false;
-
-    await loadAll();
-
-    toast("Login successful");
-
-  } catch (err) {
-
-    console.error(err);
-
-    $("#loginError").textContent =
-      err.message || "Login failed";
-  }
-}
-
-
-// ===============================
-// LOGOUT
-// ===============================
-
-async function logout() {
-
-  try {
-
-    await api("/api/admin/logout", {
-      method: "POST"
-    });
-
-  } catch (e) {}
-
-  location.reload();
-}
-
-
-// ===============================
+// ==========================================
 // IMAGE URL
-// ===============================
+// ==========================================
 
 function imageUrl(src) {
-
   if (!src) {
     return "assets/logo.png";
   }
@@ -215,17 +123,168 @@ function imageUrl(src) {
   return src;
 }
 
+// ==========================================
+// LOGIN
+// ==========================================
 
-// ===============================
+async function login(event) {
+  event.preventDefault();
+
+  const password =
+    $("#password")?.value.trim();
+
+  if (!password) {
+    $("#loginError").textContent =
+      "Password দিন।";
+    return;
+  }
+
+  $("#loginError").textContent =
+    "Signing in...";
+
+  try {
+    await api("/api/admin/login", {
+      method: "POST",
+      headers: {
+        "Content-Type":
+          "application/json"
+      },
+      body: JSON.stringify({
+        password
+      })
+    });
+
+    // Verify session before opening dashboard
+    await api("/api/admin/me");
+
+    $("#login").hidden = true;
+    $("#app").hidden = false;
+
+    await loadAll();
+
+    $("#loginError").textContent = "";
+
+    toast("Login successful");
+
+  } catch (error) {
+    console.error(
+      "LOGIN ERROR:",
+      error
+    );
+
+    $("#login").hidden = false;
+    $("#app").hidden = true;
+
+    $("#loginError").textContent =
+      error.message ||
+      "Login failed";
+  }
+}
+
+// ==========================================
+// LOGOUT
+// ==========================================
+
+async function logout() {
+  try {
+    await api(
+      "/api/admin/logout",
+      {
+        method: "POST"
+      }
+    );
+  } catch (error) {
+    console.error(error);
+  }
+
+  location.reload();
+}
+
+// ==========================================
+// TABS
+// ==========================================
+
+function setupTabs() {
+  document
+    .querySelectorAll(".tab")
+    .forEach((button) => {
+      button.onclick = () => {
+
+        document
+          .querySelectorAll(".tab")
+          .forEach((item) => {
+            item.classList.toggle(
+              "active",
+              item === button
+            );
+          });
+
+        document
+          .querySelectorAll(".panel")
+          .forEach((panel) => {
+            panel.classList.toggle(
+              "active",
+              panel.id ===
+                button.dataset.tab
+            );
+          });
+      };
+    });
+}
+
+// ==========================================
+// DASHBOARD
+// ==========================================
+
+async function loadDashboard() {
+  const data =
+    await api(
+      "/api/admin/dashboard"
+    );
+
+  state.dashboard = data;
+
+  if ($("#revenue")) {
+    $("#revenue").textContent =
+      money(data.revenue);
+  }
+
+  if ($("#ordersCount")) {
+    $("#ordersCount").textContent =
+      Number(data.orders || 0);
+  }
+
+  if ($("#productsCount")) {
+    $("#productsCount").textContent =
+      Number(data.products || 0);
+  }
+
+  if ($("#agentsCount")) {
+    $("#agentsCount").textContent =
+      Number(data.agents || 0);
+  }
+}
+
+// ==========================================
 // PRODUCTS
-// ===============================
+// ==========================================
+
+async function loadProducts() {
+  state.products =
+    await api(
+      "/api/admin/products"
+    );
+
+  renderProducts();
+}
 
 function renderProducts() {
+  const box =
+    $("#productTable");
 
-  const box = $("#productTable");
+  if (!box) return;
 
   if (!state.products.length) {
-
     box.innerHTML =
       `<div class="empty">
         No products yet. Add your first product.
@@ -236,11 +295,8 @@ function renderProducts() {
 
   box.innerHTML = `
     <div class="table-wrap">
-
       <table>
-
         <thead>
-
           <tr>
             <th>Product</th>
             <th>Price</th>
@@ -248,135 +304,154 @@ function renderProducts() {
             <th>Flags</th>
             <th>Action</th>
           </tr>
-
         </thead>
 
         <tbody>
+          ${state.products
+            .map(
+              (product) => `
+                <tr>
 
-          ${state.products.map((p) => `
+                  <td>
+                    <div style="
+                      display:flex;
+                      gap:10px;
+                      align-items:center
+                    ">
 
-            <tr>
+                      <img
+                        src="${esc(
+                          imageUrl(
+                            product.image
+                          )
+                        )}"
+                        style="
+                          width:52px;
+                          height:52px;
+                          object-fit:cover;
+                          border-radius:10px
+                        "
+                      >
 
-              <td>
+                      <div>
+                        <b>
+                          ${esc(
+                            product.name
+                          )}
+                        </b>
 
-                <div style="
-                  display:flex;
-                  gap:10px;
-                  align-items:center
-                ">
+                        <small
+                          style="display:block"
+                        >
+                          #${product.id}
+                        </small>
+                      </div>
 
-                  <img
-                    src="${esc(imageUrl(p.image))}"
-                    style="
-                      width:52px;
-                      height:52px;
-                      object-fit:cover;
-                      border-radius:10px
-                    "
-                  >
+                    </div>
+                  </td>
 
-                  <div>
+                  <td>
+                    ${money(
+                      product.price
+                    )}
 
-                    <b>${esc(p.name)}</b>
+                    ${
+                      product.old_price
+                        ? `
+                          <del>
+                            ${money(
+                              product.old_price
+                            )}
+                          </del>
+                        `
+                        : ""
+                    }
+                  </td>
 
-                    <small style="display:block">
-                      #${p.id}
-                    </small>
+                  <td>
+                    ${esc(
+                      product.category ||
+                        "General"
+                    )}
+                  </td>
 
-                  </div>
+                  <td>
+                    ${
+                      product.featured
+                        ? "Featured "
+                        : ""
+                    }
 
-                </div>
+                    ${
+                      product.is_new
+                        ? "New"
+                        : ""
+                    }
+                  </td>
 
-              </td>
+                  <td>
+                    <button
+                      onclick="editProduct(${product.id})"
+                    >
+                      Edit
+                    </button>
 
-              <td>
+                    <button
+                      onclick="deleteProduct(${product.id})"
+                    >
+                      Delete
+                    </button>
+                  </td>
 
-                ${money(p.price)}
-
-                ${
-                  p.old_price
-                    ? `<del>${money(p.old_price)}</del>`
-                    : ""
-                }
-
-              </td>
-
-              <td>
-                ${esc(p.category || "General")}
-              </td>
-
-              <td>
-
-                ${p.featured ? "Featured " : ""}
-                ${p.is_new ? "New" : ""}
-
-              </td>
-
-              <td>
-
-                <button
-                  onclick="editProduct(${p.id})">
-                  Edit
-                </button>
-
-                <button
-                  onclick="deleteProduct(${p.id})">
-                  Delete
-                </button>
-
-              </td>
-
-            </tr>
-
-          `).join("")}
-
+                </tr>
+              `
+            )
+            .join("")}
         </tbody>
-
       </table>
-
     </div>
   `;
 }
 
-
-// ===============================
-// EDIT PRODUCT
-// ===============================
-
 window.editProduct = (id) => {
+  const product =
+    state.products.find(
+      (item) => item.id === id
+    );
 
-  const p =
-    state.products.find((x) => x.id === id);
+  if (!product) return;
 
-  if (!p) return;
+  const form =
+    $("#productForm");
 
-  const f = $("#productForm");
+  if (!form) return;
 
-  f.reset();
+  form.reset();
 
-  for (
-    const k of [
-      "id",
-      "name",
-      "price",
-      "old_price",
-      "category",
-      "description",
-      "tags"
-    ]
-  ) {
-
-    if (f.elements[k]) {
-      f.elements[k].value = p[k] ?? "";
+  [
+    "id",
+    "name",
+    "price",
+    "old_price",
+    "category",
+    "description",
+    "tags"
+  ].forEach((key) => {
+    if (form.elements[key]) {
+      form.elements[key].value =
+        product[key] ?? "";
     }
+  });
 
+  if (form.elements.featured) {
+    form.elements.featured.checked =
+      !!product.featured;
   }
 
-  f.elements.featured.checked =
-    !!p.featured;
-
-  f.elements.is_new.checked =
-    !!p.is_new;
+  if (form.elements.is_new) {
+    form.elements.is_new.checked =
+      !!product.is_new;
+  }
 
   $("#pTitle").textContent =
     "Edit Product";
@@ -385,52 +460,46 @@ window.editProduct = (id) => {
     .classList.add("open");
 };
 
+window.deleteProduct =
+  async (id) => {
 
-// ===============================
-// DELETE PRODUCT
-// ===============================
+    if (
+      !confirm(
+        "Delete this product?"
+      )
+    ) {
+      return;
+    }
 
-window.deleteProduct = async (id) => {
+    try {
+      await api(
+        `/api/admin/products/${id}`,
+        {
+          method: "DELETE"
+        }
+      );
 
-  if (!confirm("Delete this product?")) {
-    return;
-  }
+      await loadAll();
 
-  try {
+      toast(
+        "Product deleted"
+      );
 
-    await api(
-      `/api/admin/products/${id}`,
-      {
-        method: "DELETE"
-      }
-    );
+    } catch (error) {
+      toast(error.message);
+    }
+  };
 
-    await loadAll();
+async function saveProduct(event) {
+  event.preventDefault();
 
-    toast("Product deleted");
+  const form = event.target;
 
-  } catch (e) {
-
-    toast(e.message);
-  }
-};
-
-
-// ===============================
-// SAVE PRODUCT
-// ===============================
-
-async function saveProduct(e) {
-
-  e.preventDefault();
-
-  const f = e.target;
-
-  const data =
-    new FormData(f);
+  const formData =
+    new FormData(form);
 
   const id =
-    data.get("id");
+    formData.get("id");
 
   try {
 
@@ -439,39 +508,55 @@ async function saveProduct(e) {
         ? `/api/admin/products/${id}`
         : "/api/admin/products",
       {
-        method: id ? "PUT" : "POST",
-        body: data
+        method:
+          id ? "PUT" : "POST",
+        body: formData
       }
     );
 
     $("#productModal")
       .classList.remove("open");
 
-    f.reset();
+    form.reset();
+
+    if (form.elements.id) {
+      form.elements.id.value = "";
+    }
+
+    $("#pTitle").textContent =
+      "Add Product";
 
     await loadAll();
 
     toast(
-      "Product saved and synced to store"
+      "Product saved successfully"
     );
 
-  } catch (e) {
-
-    toast(e.message);
+  } catch (error) {
+    toast(error.message);
   }
 }
 
-
-// ===============================
+// ==========================================
 // ORDERS
-// ===============================
+// ==========================================
+
+async function loadOrders() {
+  state.orders =
+    await api(
+      "/api/admin/orders"
+    );
+
+  renderOrders();
+}
 
 function renderOrders() {
+  const box =
+    $("#orderTable");
 
-  const box = $("#orderTable");
+  if (!box) return;
 
   if (!state.orders.length) {
-
     box.innerHTML =
       `<div class="empty">
         No orders yet.
@@ -480,14 +565,20 @@ function renderOrders() {
     return;
   }
 
+  const statuses = [
+    "Pending",
+    "Confirmed",
+    "Processing",
+    "Shipped",
+    "Delivered",
+    "Cancelled"
+  ];
+
   box.innerHTML = `
-
     <div class="table-wrap">
-
       <table>
 
         <thead>
-
           <tr>
             <th>Order</th>
             <th>Customer</th>
@@ -495,83 +586,88 @@ function renderOrders() {
             <th>Payment</th>
             <th>Status</th>
           </tr>
-
         </thead>
 
         <tbody>
+          ${state.orders
+            .map(
+              (order) => `
+                <tr>
 
-          ${state.orders.map((o) => `
+                  <td>
+                    FMF-${String(
+                      order.id
+                    ).padStart(6, "0")}
+                  </td>
 
-            <tr>
+                  <td>
+                    ${esc(
+                      order.customer_name
+                    )}
 
-              <td>
-                FMF-${String(o.id).padStart(6, "0")}
-              </td>
+                    <small
+                      style="display:block"
+                    >
+                      ${esc(
+                        order.phone
+                      )}
+                    </small>
+                  </td>
 
-              <td>
+                  <td>
+                    ${money(
+                      order.total
+                    )}
+                  </td>
 
-                ${esc(o.customer_name)}
+                  <td>
+                    ${esc(
+                      order.payment_method
+                    )}
+                  </td>
 
-                <small style="display:block">
-                  ${esc(o.phone)}
-                </small>
+                  <td>
 
-              </td>
+                    <select
+                      onchange="
+                        updateOrder(
+                          ${order.id},
+                          this.value
+                        )
+                      "
+                    >
 
-              <td>
-                ${money(o.total)}
-              </td>
+                      ${statuses
+                        .map(
+                          (status) => `
+                            <option
+                              ${
+                                status ===
+                                order.status
+                                  ? "selected"
+                                  : ""
+                              }
+                            >
+                              ${status}
+                            </option>
+                          `
+                        )
+                        .join("")}
 
-              <td>
-                ${esc(o.payment_method)}
-              </td>
+                    </select>
 
-              <td>
+                  </td>
 
-                <select
-                  onchange="updateOrder(${o.id},this.value)"
-                >
-
-                  ${
-                    [
-                      "Pending",
-                      "Confirmed",
-                      "Processing",
-                      "Shipped",
-                      "Delivered",
-                      "Cancelled"
-                    ]
-                    .map(
-                      (s) =>
-                        `<option ${
-                          s === o.status
-                            ? "selected"
-                            : ""
-                        }>${s}</option>`
-                    )
-                    .join("")
-                  }
-
-                </select>
-
-              </td>
-
-            </tr>
-
-          `).join("")}
-
+                </tr>
+              `
+            )
+            .join("")}
         </tbody>
 
       </table>
-
     </div>
   `;
 }
-
-
-// ===============================
-// UPDATE ORDER
-// ===============================
 
 window.updateOrder =
   async (id, status) => {
@@ -594,27 +690,37 @@ window.updateOrder =
         }
       );
 
+      await loadDashboard();
+
       toast(
         "Order status updated"
       );
 
-    } catch (e) {
-
-      toast(e.message);
+    } catch (error) {
+      toast(error.message);
     }
   };
 
-
-// ===============================
+// ==========================================
 // AGENTS
-// ===============================
+// ==========================================
+
+async function loadAgents() {
+  state.agents =
+    await api(
+      "/api/admin/agents"
+    );
+
+  renderAgents();
+}
 
 function renderAgents() {
+  const box =
+    $("#agentTable");
 
-  const box = $("#agentTable");
+  if (!box) return;
 
   if (!state.agents.length) {
-
     box.innerHTML =
       `<div class="empty">
         No agents yet.
@@ -624,13 +730,11 @@ function renderAgents() {
   }
 
   box.innerHTML = `
-
     <div class="table-wrap">
 
       <table>
 
         <thead>
-
           <tr>
             <th>Agent</th>
             <th>WhatsApp</th>
@@ -638,58 +742,81 @@ function renderAgents() {
             <th>Active</th>
             <th>Action</th>
           </tr>
-
         </thead>
 
         <tbody>
 
-          ${state.agents.map((a) => `
+          ${state.agents
+            .map(
+              (agent) => `
+                <tr>
 
-            <tr>
+                  <td>
+                    ${esc(
+                      agent.name
+                    )}
+                  </td>
 
-              <td>
-                ${esc(a.name)}
-              </td>
+                  <td>
+                    ${esc(
+                      agent.whatsapp
+                    )}
+                  </td>
 
-              <td>
-                ${esc(a.whatsapp)}
-              </td>
+                  <td>
+                    ${
+                      agent.messenger_url
+                        ? `
+                          <a
+                            href="${esc(
+                              agent.messenger_url
+                            )}"
+                            target="_blank"
+                            rel="noopener"
+                          >
+                            Open
+                          </a>
+                        `
+                        : "—"
+                    }
+                  </td>
 
-              <td>
+                  <td>
+                    ${
+                      agent.active
+                        ? "Yes"
+                        : "No"
+                    }
+                  </td>
 
-                ${
-                  a.messenger_url
-                    ? `<a
-                        href="${esc(a.messenger_url)}"
-                        target="_blank">
-                        Open
-                       </a>`
-                    : "—"
-                }
+                  <td>
 
-              </td>
+                    <button
+                      onclick="
+                        editAgent(
+                          ${agent.id}
+                        )
+                      "
+                    >
+                      Edit
+                    </button>
 
-              <td>
-                ${a.active ? "Yes" : "No"}
-              </td>
+                    <button
+                      onclick="
+                        deleteAgent(
+                          ${agent.id}
+                        )
+                      "
+                    >
+                      Delete
+                    </button>
 
-              <td>
+                  </td>
 
-                <button
-                  onclick="editAgent(${a.id})">
-                  Edit
-                </button>
-
-                <button
-                  onclick="deleteAgent(${a.id})">
-                  Delete
-                </button>
-
-              </td>
-
-            </tr>
-
-          `).join("")}
+                </tr>
+              `
+            )
+            .join("")}
 
         </tbody>
 
@@ -699,63 +826,255 @@ function renderAgents() {
   `;
 }
 
-
-// ===============================
-// EDIT AGENT
-// ===============================
-
 window.editAgent = (id) => {
+  const agent =
+    state.agents.find(
+      (item) => item.id === id
+    );
 
-  const a =
-    state.agents.find((x) => x.id === id);
+  if (!agent) return;
 
-  if (!a) return;
+  const form =
+    $("#agentForm");
 
-  const f = $("#agentForm");
+  if (!form) return;
 
-  f.reset();
+  form.reset();
 
-  f.elements.id.value =
-    a.id;
+  form.elements.id.value =
+    agent.id;
 
-  f.elements.name.value =
-    a.name;
+  form.elements.name.value =
+    agent.name;
 
-  f.elements.whatsapp.value =
-    a.whatsapp;
+  form.elements.whatsapp.value =
+    agent.whatsapp;
 
-  f.elements.messenger_url.value =
-    a.messenger_url || "";
+  form.elements.messenger_url.value =
+    agent.messenger_url || "";
 
-  f.elements.active.checked =
-    !!a.active;
+  form.elements.active.checked =
+    !!agent.active;
 
   $("#agentModal")
     .classList.add("open");
 };
 
+window.deleteAgent =
+  async (id) => {
 
-// ===============================
-// DELETE AGENT
-// ===============================
+    if (
+      !confirm(
+        "Delete this agent?"
+      )
+    ) {
+      return;
+    }
 
-window.deleteAgent = async (id) => {
+    try {
 
-  if (!confirm("Delete this agent?")) {
-    return;
-  }
+      await api(
+        `/api/admin/agents/${id}`,
+        {
+          method: "DELETE"
+        }
+      );
+
+      await loadAll();
+
+      toast(
+        "Agent deleted"
+      );
+
+    } catch (error) {
+      toast(error.message);
+    }
+  };
+
+async function saveAgent(event) {
+  event.preventDefault();
+
+  const form =
+    event.target;
+
+  const data = {
+    name:
+      form.elements.name.value.trim(),
+
+    whatsapp:
+      form.elements.whatsapp.value.trim(),
+
+    messenger_url:
+      form.elements.messenger_url.value.trim(),
+
+    active:
+      form.elements.active.checked
+  };
+
+  const id =
+    form.elements.id.value;
 
   try {
 
     await api(
-      `/api/admin/agents/${id}`,
+      id
+        ? `/api/admin/agents/${id}`
+        : "/api/admin/agents",
       {
-        method: "DELETE"
+        method:
+          id ? "PUT" : "POST",
+
+        headers: {
+          "Content-Type":
+            "application/json"
+        },
+
+        body:
+          JSON.stringify(data)
       }
     );
 
+    $("#agentModal")
+      .classList.remove("open");
+
+    form.reset();
+
+    form.elements.active.checked =
+      true;
+
     await loadAll();
 
-    toast("Agent deleted");
+    toast(
+      "Agent saved successfully"
+    );
 
- 
+  } catch (error) {
+    toast(error.message);
+  }
+}
+
+// ==========================================
+// SETTINGS
+// ==========================================
+
+async function loadSettings() {
+  state.settings =
+    await api(
+      "/api/admin/settings"
+    );
+
+  renderSettings();
+}
+
+function renderSettings() {
+  const form =
+    $("#settingsForm");
+
+  if (!form) return;
+
+  const settings =
+    state.settings;
+
+  const fields = [
+    "store_name",
+    "logo",
+    "delivery_promise",
+    "bkash_number",
+    "nagad_number",
+    "rocket_number",
+    "payment_note"
+  ];
+
+  fields.forEach((key) => {
+    if (form.elements[key]) {
+      form.elements[key].value =
+        settings[key] || "";
+    }
+  });
+
+  [
+    "bkash_enabled",
+    "nagad_enabled",
+    "rocket_enabled",
+    "cod_enabled"
+  ].forEach((key) => {
+    if (form.elements[key]) {
+      form.elements[key].checked =
+        settings[key] === "1";
+    }
+  });
+
+  if ($("#storeTitle")) {
+    $("#storeTitle").textContent =
+      settings.store_name ||
+      "FM FASHION";
+  }
+}
+
+async function saveSettings(event) {
+  event.preventDefault();
+
+  const form =
+    event.target;
+
+  const data = {
+    store_name:
+      form.elements.store_name.value,
+
+    logo:
+      form.elements.logo.value,
+
+    delivery_promise:
+      form.elements.delivery_promise.value,
+
+    bkash_number:
+      form.elements.bkash_number.value,
+
+    nagad_number:
+      form.elements.nagad_number.value,
+
+    rocket_number:
+      form.elements.rocket_number.value,
+
+    payment_note:
+      form.elements.payment_note.value,
+
+    bkash_enabled:
+      form.elements.bkash_enabled.checked,
+
+    nagad_enabled:
+      form.elements.nagad_enabled.checked,
+
+    rocket_enabled:
+      form.elements.rocket_enabled.checked,
+
+    cod_enabled:
+      form.elements.cod_enabled.checked
+  };
+
+  try {
+
+    const result =
+      await api(
+        "/api/admin/settings",
+        {
+          method: "PUT",
+
+          headers: {
+            "Content-Type":
+              "application/json"
+          },
+
+          body:
+            JSON.stringify(data)
+        }
+      );
+
+    state.settings =
+      result.settings ||
+      state.settings;
+
+    renderSettings();
+
+    if ($("#saved")) {
+      $("#saved").textConte
