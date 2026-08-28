@@ -1055,20 +1055,24 @@ async function saveSettings(event) {
 // LOGIN (Fixed & Direct)
 // ==========================================
 
-async function login(event) {
-  event.preventDefault();
+// ==========================================
+// DIRECT LOGIN FUNCTION
+// ==========================================
 
-  const password = $("#password")?.value.trim();
+async function loginUser() {
+  const passwordInput = document.getElementById("password");
+  const errorBox = document.getElementById("loginError");
+  const password = passwordInput ? passwordInput.value.trim() : "";
 
   if (!password) {
-    $("#loginError").textContent = "Password দিন।";
+    if (errorBox) errorBox.textContent = "দয়া করে পাসওয়ার্ড দিন।";
     return;
   }
 
-  $("#loginError").textContent = "Signing in...";
+  if (errorBox) errorBox.textContent = "Signing in...";
 
   try {
-    await api("/api/admin/login", {
+    const response = await fetch("/api/admin/login", {
       method: "POST",
       headers: {
         "Content-Type": "application/json"
@@ -1076,89 +1080,55 @@ async function login(event) {
       body: JSON.stringify({ password })
     });
 
-    // সরাসরি লগইন সফল হলে ড্যাশবোর্ড ওপেন করে দেব
-    $("#login").hidden = true;
-    $("#app").hidden = false;
-    $("#loginError").textContent = "";
+    const data = await response.json();
 
-    try {
+    if (!response.ok) {
+      throw new Error(data.error || data.message || "Login failed");
+    }
+
+    // সফলভাবে লগইন হলে লগইন বক্স হাইড এবং ড্যাশবোর্ড শো করবে
+    const loginSection = document.getElementById("login");
+    const appSection = document.getElementById("app");
+
+    if (loginSection) loginSection.hidden = true;
+    if (appSection) appSection.hidden = false;
+    if (errorBox) errorBox.textContent = "";
+
+    // ডেটা লোড করা
+    if (typeof loadAll === "function") {
       await loadAll();
+    }
+    
+    if (typeof toast === "function") {
       toast("Login successful");
-    } catch (loadError) {
-      console.error("DASHBOARD LOAD ERROR:", loadError);
-      toast("Login successful, but some data failed to load.");
     }
 
   } catch (error) {
     console.error("LOGIN ERROR:", error);
-
-    $("#login").hidden = false;
-    $("#app").hidden = true;
-
-    $("#loginError").textContent =
-      error.message || "Login failed";
+    if (errorBox) {
+      errorBox.textContent = error.message || "Login failed";
+    }
   }
 }
 
-// ==========================================
-// LOAD ALL & INITIALIZATION
-// ==========================================
-
-async function loadAll() {
-  await Promise.all([
-    loadDashboard(),
-    loadProducts(),
-    loadOrders(),
-    loadAgents(),
-    loadSettings()
-  ]);
-}
-
+// অটো সেশন চেক ও পেজ লোড
 window.addEventListener("DOMContentLoaded", async () => {
-  setupTabs();
-  setupModals();
+  if (typeof setupTabs === "function") setupTabs();
+  if (typeof setupModals === "function") setupModals();
 
-  const loginForm = $("#loginForm") || $("#login")?.querySelector("form");
-  if (loginForm) {
-    loginForm.onsubmit = login;
-  }
-
-  const productForm = $("#productForm");
-  if (productForm) {
-    productForm.onsubmit = saveProduct;
-  }
-
-  const agentForm = $("#agentForm");
-  if (agentForm) {
-    agentForm.onsubmit = saveAgent;
-  }
-
-  const settingsForm = $("#settingsForm");
-  if (settingsForm) {
-    settingsForm.onsubmit = saveSettings;
-  }
-
-  const aiForm = $("#aiForm");
-  if (aiForm) {
-    aiForm.onsubmit = analyzeAIProduct;
-  }
-
-  const logoutBtn = $("#logoutBtn");
-  if (logoutBtn) {
-    logoutBtn.onclick = logout;
-  }
-
-  // অটো সেশন চেক (যদি অলরেডি কুকি থাকে)
   try {
-    const me = await api("/api/admin/me");
-    if (me) {
-      $("#login").hidden = true;
-      $("#app").hidden = false;
-      await loadAll();
+    const res = await fetch("/api/admin/me");
+    if (res.ok) {
+      const loginSection = document.getElementById("login");
+      const appSection = document.getElementById("app");
+      if (loginSection) loginSection.hidden = true;
+      if (appSection) appSection.hidden = false;
+      if (typeof loadAll === "function") {
+        await loadAll();
+      }
     }
   } catch (e) {
-    $("#login").hidden = false;
-    $("#app").hidden = true;
+    console.log("Not logged in yet");
   }
 });
   
