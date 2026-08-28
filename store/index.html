@@ -1,15 +1,67 @@
-<!doctype html><html lang="bn"><head><meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1"><title>FM FASHION — Admin</title><link rel="preconnect" href="https://fonts.googleapis.com"><link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=DM+Sans:wght@400;500;600;700&family=Playfair+Display:wght@600;700&display=swap"><link rel="stylesheet" href="style.css"></head><body>
-<div id="login" class="login"><div class="login-card"><img src="assets/logo.png"><span class="eyebrow">FM FASHION</span><h1>Admin Control Center</h1><p>শুধু authorized admin access.</p><form id="loginForm"><input id="password" type="password" placeholder="Admin password" required><button class="gold">Secure Sign In</button></form><small id="loginError"></small></div></div>
-<div id="app" hidden><header><div class="brand"><img src="assets/logo.png"><div><b id="storeTitle">FM FASHION</b><small>ADMIN PANEL</small></div></div><div><a id="storeLink" href="#" target="_blank">Open Store ↗</a><button id="logout">Logout</button></div></header>
-<main><div class="welcome"><div><span class="eyebrow">CONTROL CENTER</span><h1>Store Dashboard</h1></div><button id="refresh">↻ Refresh</button></div>
-<div class="stats"><div><span>Revenue</span><b id="revenue">৳0</b></div><div><span>Orders</span><b id="ordersCount">0</b></div><div><span>Products</span><b id="productsCount">0</b></div><div><span>Active Agents</span><b id="agentsCount">0</b></div></div>
-<div class="tabs"><button class="tab active" data-tab="products">Products</button><button class="tab" data-tab="orders">Orders</button><button class="tab" data-tab="agents">Support Agents</button><button class="tab" data-tab="settings">Payments & Settings</button><button class="tab" data-tab="ai">AI Add Product</button></div>
-<section id="products" class="panel active"><div class="panel-head"><h2>Products</h2><button class="gold" id="newProduct">+ Add Product</button></div><div id="productTable"></div></section>
-<section id="orders" class="panel"><div class="panel-head"><h2>Orders</h2></div><div id="orderTable"></div></section>
-<section id="agents" class="panel"><div class="panel-head"><h2>Support Agents</h2><button class="gold" id="newAgent">+ Add Agent</button></div><div id="agentTable"></div></section>
-<section id="settings" class="panel"><h2>Payments & Store Settings</h2><form id="settingsForm" class="form"><label>Store name<input name="store_name" required></label><label>Logo URL<input name="logo" placeholder="https://..."></label><label>Delivery promise<input name="delivery_promise"></label><div class="three"><label>bKash number<input name="bkash_number"></label><label>Nagad number<input name="nagad_number"></label><label>Rocket number<input name="rocket_number"></label></div><div class="checks"><label><input type="checkbox" name="bkash_enabled"> bKash ON</label><label><input type="checkbox" name="nagad_enabled"> Nagad ON</label><label><input type="checkbox" name="rocket_enabled"> Rocket ON</label><label><input type="checkbox" name="cod_enabled"> Cash on Delivery ON</label></div><label>Payment instruction<textarea name="payment_note"></textarea></label><button class="gold">Save & Sync Store</button><span id="saved"></span></form></section>
-<section id="ai" class="panel"><h2>AI Add Product</h2><p>Product image + price দিন। AI নাম, description, category ও tags suggest করবে। Publish করার আগে preview দেখাবে।</p><form id="aiForm" class="form"><label>Image<input type="file" name="image" accept="image/*" required></label><label>Price<input type="number" name="price" min="0" required></label><button class="gold">Analyze Product</button></form><div id="aiResult"></div></section>
-</main></div>
-<div id="productModal" class="overlay"><div class="modal"><button data-close>×</button><h2 id="pTitle">Add Product</h2><form id="productForm" class="form"><input type="hidden" name="id"><label>Name<input name="name" required></label><label>Price<input name="price" type="number" min="0" required></label><label>Old Price<input name="old_price" type="number" min="0"></label><label>Category<input name="category"></label><label>Description<textarea name="description"></textarea></label><label>Tags<input name="tags" placeholder="shirt, men, premium"></label><label>Image<input name="image" type="file" accept="image/*"></label><label><input type="checkbox" name="featured"> Featured</label><label><input type="checkbox" name="is_new"> New</label><button class="gold">Save Product</button></form></div></div>
-<div id="agentModal" class="overlay"><div class="modal"><button data-close>×</button><h2>Support Agent</h2><form id="agentForm" class="form"><input type="hidden" name="id"><label>Agent name<input name="name" required></label><label>WhatsApp number<input name="whatsapp" placeholder="8801XXXXXXXXX" required></label><label>Messenger link<input name="messenger_url" placeholder="https://m.me/..."></label><label><input type="checkbox" name="active" checked> Active</label><button class="gold">Save Agent</button></form></div></div>
-<script src="config.js"></script><script src="app.js"></script></body></html>
+<!doctype html>
+<html lang="bn">
+<head>
+<meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1">
+<meta name="description" content="FM FASHION — premium online fashion marketplace">
+<meta name="theme-color" content="#080b12">
+<title>FM FASHION — Premium Store</title>
+<link rel="preconnect" href="https://fonts.googleapis.com"><link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link href="https://fonts.googleapis.com/css2?family=DM+Sans:wght@400;500;600;700&family=Playfair+Display:wght@600;700&display=swap" rel="stylesheet">
+<link rel="stylesheet" href="style.css">
+</head>
+<body>
+<div class="topline">🚚 সারা বাংলাদেশে ডেলিভারি · 🔒 নিরাপদ Checkout · 💬 ২৪/৭ Support</div>
+<header class="nav">
+  <a class="brand" href="#"><img id="logo" src="assets/logo.png" alt="FM Fashion"><span>FM FASHION</span></a>
+  <div class="search"><input id="search" placeholder="আপনার পছন্দের পণ্য খুঁজুন…"><button id="searchBtn">⌕</button></div>
+  <nav><a href="#shop">Shop</a><a href="#categories">Categories</a><a href="#offers">Offers</a></nav>
+  <div class="actions"><button id="wishlistBtn">♡</button><button id="cartBtn">🛒 <b id="cartCount">0</b></button><button id="menuBtn" class="mobile-only">☰</button></div>
+</header>
+<div id="mobileNav" class="mobile-nav"><a href="#shop">Shop</a><a href="#categories">Categories</a><a href="#offers">Offers</a></div>
+
+<main>
+<section class="hero">
+  <div class="hero-copy"><span class="eyebrow">FM FASHION · NEW SEASON</span>
+    <h1>আপনার স্টাইল,<br><em>আপনার পরিচয়</em> ✨</h1>
+    <p>Premium fashion, smart pricing এবং সহজ online ordering—সব এক জায়গায়।</p>
+    <div class="hero-buttons"><a class="btn gold" href="#shop">Shop Now →</a><button class="btn ghost" id="heroChat">🤖 AI Assistant</button></div>
+    <div class="trust"><span>✓ Premium quality</span><span>✓ Easy returns</span><span>✓ Fast delivery</span></div>
+  </div>
+  <div class="hero-visual"><img src="assets/hero.jpg" alt="FM Fashion collection"></div>
+</section>
+
+<section class="benefits"><div>🚚<b>দেশজুড়ে Delivery</b><small>দ্রুত ও নির্ভরযোগ্য</small></div><div>🛡️<b>Secure Checkout</b><small>সুরক্ষিত তথ্য</small></div><div>💬<b>AI + Agent Support</b><small>যখন দরকার</small></div><div>↻<b>Easy Order</b><small>সহজে কিনুন</small></div></section>
+
+<section id="categories" class="section"><div class="section-head"><div><span class="eyebrow">EXPLORE</span><h2>ক্যাটাগরি</h2></div></div><div id="categoryChips" class="chips"></div></section>
+
+<section id="shop" class="section"><div class="section-head"><div><span class="eyebrow">CURATED FOR YOU</span><h2>নতুন কালেকশন 🔥</h2></div><div class="filters"><select id="sort"><option value="new">নতুন আগে</option><option value="priceLow">কম দাম</option><option value="priceHigh">বেশি দাম</option><option value="name">নাম</option></select></div></div><div id="products" class="grid"></div></section>
+
+<section id="offers" class="offer"><div><span class="eyebrow">LIMITED TIME</span><h2>Smart কেনাকাটা, Smart জীবন ❤️</h2><p>Flash offers এবং নতুন collection নিয়মিত update হবে Admin Panel থেকে।</p></div><a class="btn gold" href="#shop">Explore Offers</a></section>
+
+<section class="section"><div class="section-head"><div><span class="eyebrow">NEED HELP?</span><h2>Contact with Agent</h2></div></div><div id="agents" class="agent-grid"></div></section>
+<section class="newsletter"><div><span class="eyebrow">STAY UPDATED</span><h2>নতুন পণ্য ও অফার মিস করবেন না</h2></div><form onsubmit="event.preventDefault();toast('ধন্যবাদ! আপনি আপডেট লিস্টে আছেন।')"><input type="email" placeholder="আপনার email" required><button class="btn gold">Subscribe</button></form></section>
+</main>
+
+<footer><div><img src="assets/logo.png" alt="FM Fashion"><p>FM FASHION — premium products, easy ordering.</p></div><div><b>Quick Links</b><a href="#shop">Products</a><a href="#categories">Categories</a><a href="#offers">Offers</a></div><div><b>Payment</b><p id="footerPay">bKash · Nagad · Rocket · COD</p></div><div><b>Support</b><p>AI Chat · Contact Agent</p></div></footer>
+
+<button id="agentFab" class="float agent-fab">🟢 <span>Contact with Agent</span></button>
+<button id="aiFab" class="float ai-fab">🤖 <span>AI Chat</span></button>
+
+<div id="drawer" class="overlay"><aside class="drawer"><div class="drawer-head"><h2>Your Cart</h2><button data-close>×</button></div><div id="cartItems"></div><div class="summary"><span>Subtotal</span><b id="cartTotal">৳0</b></div><button id="checkout" class="btn gold wide">Buy Now / Checkout →</button></aside></div>
+
+<div id="checkoutModal" class="overlay"><div class="modal"><button data-close>×</button><h2>অর্ডার সম্পন্ন করুন</h2><p class="muted">আপনার ঠিকানা ও payment method দিন।</p><div id="checkoutSummary"></div>
+<form id="checkoutForm">
+<input name="customer_name" placeholder="পূর্ণ নাম *" required><input name="phone" placeholder="মোবাইল নম্বর *" required><input name="email" type="email" placeholder="Email (optional)">
+<div class="two"><select name="division" required><option value="">বিভাগ নির্বাচন করুন *</option><option>ঢাকা</option><option>চট্টগ্রাম</option><option>রাজশাহী</option><option>খুলনা</option><option>বরিশাল</option><option>সিলেট</option><option>রংপুর</option><option>ময়মনসিংহ</option></select><input name="district" placeholder="জেলা *" required></div>
+<input name="upazila" placeholder="উপজেলা / থানা *" required><textarea name="address" placeholder="বিস্তারিত ঠিকানা *" required></textarea><textarea name="note" placeholder="Delivery instruction (optional)"></textarea>
+<h3>Payment</h3><div id="payments"></div><input name="transaction_id" placeholder="Online payment হলে Transaction ID">
+<button class="btn gold wide">অর্ডার কনফার্ম করুন ✓</button></form><div id="success" class="success" hidden></div></div></div>
+
+<div id="agentModal" class="overlay"><div class="modal"><button data-close>×</button><h2>Contact with Agent</h2><p class="muted">আপনার পছন্দের agent বেছে নিন।</p><div id="agentModalList"></div></div></div>
+
+<div id="chat" class="chat"><div class="chat-head"><div><b>AI Shopping Assistant</b><small>FM FASHION</small></div><button id="chatClose">×</button></div><div id="messages" class="messages"><div class="bubble bot">আসসালামু আলাইকুম! Product, price, size, delivery বা order সম্পর্কে জিজ্ঞেস করুন।</div></div><form id="chatForm"><input id="chatInput" placeholder="কিছু জিজ্ঞেস করুন…" required><button>➤</button></form></div>
+
+<div id="productModal" class="overlay"><div class="modal product-modal"><button data-close>×</button><div id="productDetail"></div></div></div>
+<div id="toast"></div>
+<script src="config.js"></script><script src="app.js"></script>
+</body></html>
