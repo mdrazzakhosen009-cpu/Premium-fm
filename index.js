@@ -154,6 +154,26 @@ app.post("/api/admin/logout", admin, (req, res) => {
 app.get("/api/admin/me", admin, (req, res) => {
     res.json({authenticated: true});
 });
+app.post("/api/chat", async (req, res) => {
+    try {
+        const { message } = req.body;
+        if (!message) return res.status(400).json({ error: "Message is required" });
+
+        const s = settingsData();
+        let reply = `ওয়ালাইকুম আসসালাম! ${s.store_name}-এ আপনাকে স্বাগতম। আমাদের কাছে বর্তমানে চমৎকার সব কালেকশন রয়েছে। নির্দিষ্ট কোনো প্রোডাক্ট, দাম বা সাইজ সম্পর্কে জানতে চাইলে বলতে পারেন!`;
+
+        const msgLower = message.toLowerCase();
+        if (msgLower.includes("price") || msgLower.includes("দাম")) {
+            reply = `আমাদের প্রোডাক্টগুলোর দাম খুবই সুলভ এবং প্রিমিয়াম কোয়ালিটির। আপনি ক্যাটাগরি সেকশন থেকে প্রোডাক্টের বিস্তারিত দাম দেখতে পারেন।`;
+        } else if (msgLower.includes("delivery") || msgLower.includes("ডেলিভারি")) {
+            reply = `আমরা সারা বাংলাদেশে ক্যাশ অন ডেলিভারিতে পার্সেল পাঠিয়ে থাকি। ঢাকার ভেতরে ডেলিভারি চার্জ ৳${s.delivery_charge_inside || 60} এবং ঢাকার বাইরে ৳${s.delivery_charge_outside || 120}।`;
+        }
+
+        res.json({ reply });
+    } catch (err) {
+        res.status(500).json({ error: err.message });
+    }
+});
 
 const PORT = process.env.PORT || 10000;
 app.listen(PORT, () => {
