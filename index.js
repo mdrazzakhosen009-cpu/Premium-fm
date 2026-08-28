@@ -94,7 +94,6 @@ function admin(req, res, next) {
 
 // ---------------- API ROUTES ----------------
 
-// Admin Login Route
 app.post("/api/admin/login", (req, res) => {
     try {
         const { password } = req.body;
@@ -143,7 +142,6 @@ app.post("/api/admin/logout", (req, res) => {
     res.json({ success: true });
 });
 
-// Products API
 app.get("/api/products", (req, res) => {
     const products = db.prepare("SELECT * FROM products ORDER BY id DESC").all();
     res.json(products);
@@ -162,7 +160,6 @@ app.delete("/api/products/:id", admin, (req, res) => {
     res.json({ success: true });
 });
 
-// Settings API
 app.get("/api/settings", (req, res) => {
     const s = settingsData();
     res.json({
@@ -180,13 +177,11 @@ app.get("/api/settings", (req, res) => {
     });
 });
 
-// Agents API
 app.get("/api/agents", (req, res) => {
     const agents = db.prepare("SELECT * FROM agents").all();
     res.json(agents);
 });
 
-// Orders API
 app.post("/api/orders", (req, res) => {
     const { name, phone, email, division, district, upazila, address, items, total } = req.body;
     const stmt = db.prepare("INSERT INTO orders (customer_name, phone, email, division, district, upazila, address, items, total_amount, delivery_charge) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?)");
@@ -199,7 +194,6 @@ app.get("/api/orders", admin, (req, res) => {
     res.json(orders);
 });
 
-// AI Chat API
 app.post("/api/chat", (req, res) => {
     try {
         const { message } = req.body;
@@ -225,4 +219,4 @@ const PORT = process.env.PORT || 3000;
 app.listen(PORT, () => {
     console.log(`Server is running on port ${PORT}`);
 });
-        
+         
