@@ -29,15 +29,31 @@ CREATE TABLE IF NOT EXISTS settings(key TEXT PRIMARY KEY,value TEXT NOT NULL DEF
 CREATE TABLE IF NOT EXISTS sessions(token TEXT PRIMARY KEY,expires_at INTEGER NOT NULL);
 `);
 
-const defaults={admin_password_hash:"",store_name:"FM FASHION",logo:"assets/logo.png",delivery_charge_inside:"60",delivery_charge_outside:"120",bkash_enabled:"1",bkash_number:"",nagad_enabled:"1",nagad_number:"",rocket_enabled:"0",rocket_number:"",cod_enabled:"1",hero_title:"Discover Premium Fashion",hero_subtitle:"Upgrade your wardrobe with our latest exclusive collection.",hero_image:"hero.jpg"};
-const up=db.prepare("INSERT INTO settings(key,value) VALUES(?,?) ON CONFLICT(key) DO NOTHING");
+const defaults = {
+    admin_password_hash: "",
+    store_name: "FM FASHION",
+    logo: "assets/logo.png",
+    delivery_charge_inside: "60",
+    delivery_charge_outside: "120",
+    bkash_enabled: "1",
+    bkash_number: "",
+    nagad_enabled: "1",
+    nagad_number: "",
+    rocket_enabled: "0",
+    rocket_number: "",
+    cod_enabled: "1",
+    hero_title: "Discover Premium Fashion",
+    hero_subtitle: "Upgrade your wardrobe with our latest exclusive collection.",
+    hero_image: "hero.jpg"
+};
+const up = db.prepare("INSERT INTO settings(key,value) VALUES(?,?) ON CONFLICT(key) DO NOTHING");
 for(const [k,v] of Object.entries(defaults)) up.run(k,v);
 
 app.use(cookieParser());
-app.use(express.json({limit:"10mb"}));
-app.use(express.urlencoded({extended:true}));
+app.use(express.json({ limit: "10mb" }));
+app.use(express.urlencoded({ extended: true }));
 
-app.use((req,res,next)=>{
+app.use((req, res, next) => {
     const origin = req.headers.origin;
     if(origin) {
         res.setHeader("Access-Control-Allow-Origin", origin);
@@ -45,11 +61,11 @@ app.use((req,res,next)=>{
     }
     res.setHeader("Access-Control-Allow-Headers", "Content-Type, Authorization");
     res.setHeader("Access-Control-Allow-Methods", "GET,POST,PUT,PATCH,DELETE,OPTIONS");
-    if(req.method==="OPTIONS") return res.sendStatus(204);
+    if(req.method === "OPTIONS") return res.sendStatus(204);
     next();
 });
 
-const upload = multer({storage:multer.diskStorage({destination:UPLOADS,filename:(r,f,cb)=>cb(null,Date.now()+"-"+f.originalname)})});
+const upload = multer({ storage: multer.diskStorage({ destination: UPLOADS, filename: (r, f, cb) => cb(null, Date.now() + "-" + f.originalname) }) });
 
 const STORE_DIR = path.join(ROOT, "store");
 const ADMIN_DIR = path.join(ROOT, "admin");
@@ -68,17 +84,17 @@ app.get("/admin", (req, res) => {
 
 const settingsData = () => Object.fromEntries(db.prepare("SELECT key,value FROM settings").all());
 
-function admin(req,res,next){
+function admin(req, res, next) {
     const t = req.cookies.admin_session;
-    if(!t) return res.status(401).json({error:"Unauthorized"});
+    if(!t) return res.status(401).json({ error: "Unauthorized" });
     const s = db.prepare("SELECT * FROM sessions WHERE token=? AND expires_at>?").get(t, Date.now());
-    if(!s) return res.status(401).json({error:"Unauthorized"});
+    if(!s) return res.status(401).json({ error: "Unauthorized" });
     next();
 }
 
 // ---------------- API ROUTES ----------------
 
-// Admin Login
+// Admin Login Route
 app.post("/api/admin/login", (req, res) => {
     try {
         const { password } = req.body;
@@ -209,3 +225,4 @@ const PORT = process.env.PORT || 3000;
 app.listen(PORT, () => {
     console.log(`Server is running on port ${PORT}`);
 });
+        
