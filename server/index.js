@@ -960,124 +960,120 @@ app.get(
 ========================= */
 
 app.post(
-  "/api/admin/products",
+  "/api/admin/ai-product",
   admin,
   upload.single("image"),
-  (req, res) => {
-    try {
-      const {
-        name,
-        price,
-        old_price = 0,
-        category = "General",
-        description = "",
-        tags = "",
-        featured,
-        is_new,
-        image_url = ""
-      } = req.body;
+  async (req, res) => {
+    if (!req.file) {
+      return res.status(400).json({ error: "Image required" });
+    }
 
-      if (
-        !String(name || "").trim()
-      ) {
-        return res.status(400).json({
-          error:
-            "Product name is required"
-        });
-      }
+    const price = Number(req.body.price);
 
-      const productPrice =
-        Number(price);
+    if (!Number.isFinite(price) || price <= 0) {
+      return res.status(400).json({ error: "Price required" });
+    }
 
-      if (
-        !Number.isFinite(productPrice) ||
-        productPrice < 0
-      ) {
-        return res.status(400).json({
-          error:
-            "Valid product price is required"
-        });
-      }
+    let suggestion = {
+      name: "Premium Fashion Product",
+      description:
+        "Premium quality fashion product from FM FASHION.",
+      category: "Fashion",
+      tags: "fashion,premium,new"
+    };
 
-      const image =
-        req.file
-          ? `/uploads/${req.file.filename}`
-          : String(image_url || "");
+    if (process.env.OPENAI_API_KEY) {
+      try {
+        const base64 = fs
+          .readFileSync(req.file.path)
+          .toString("base64");
 
-      const result =
-        db.prepare(
-          `
-          INSERT INTO products (
-            name,
-            description,
-            price,
-            old_price,
-            image,
-            category,
-            tags,
-            featured,
-            is_new
-          )
-          VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?)
-          `
-        ).run(
-          String(name).trim(),
-          String(description),
-          productPrice,
-          Number(old_price) || 0,
-          image,
-          String(category),
-          String(tags),
-          featured === "on" ? 1 : 0,
-          is_new === "on" ? 1 : 0
+        const response = await fetch(
+          "https://api.openai.com/v1/responses",
+          {
+            method: "POST",
+            headers: {
+              "Content-Type": "application/json",
+              Authorization: `Bearer ${process.env.OPENAI_API_KEY}`
+            },
+            body: JSON.stringify({
+              model:
+                process.env.OPENAI_VISION_MODEL ||
+                "gpt-4.1-mini",
+
+              input: [
+                {
+                  role: "user",
+                  content: [
+                    {
+                      type: "input_text",
+                      text:
+                        "Identify this fashion product. Return ONLY JSON with name, description, category, tags."
+                    },
+                    {
+                      type: "input_image",
+                      image_url:
+                        `data:${req.file.mimetype};base64,${base64}`
+                    }
+                  ]
+                }
+              ]
+            })
+          }
         );
 
-      res.json({
-        success: true,
-        id: result.lastInsertRowid
-      });
-    } catch (error) {
-      console.error(error);
+        const result = await response.json();
 
-      res.status(500).json({
-        error:
-          "Product could not be added"
-      });
+        if (response.ok && result.output_text) {
+          try {
+            const parsed = JSON.parse(result.output_text);
+
+            if (
+              parsed &&
+              typeof parsed === "object"
+            ) {
+              suggestion = {
+                ...suggestion,
+                ...parsed
+              };
+            }
+          } catch (error) {
+            console.error(
+              "AI JSON parse error:",
+              error
+            );
+          }
+        }
+      } catch (error) {
+        console.error(
+          "AI product error:",
+          error
+        );
+      }
     }
+
+    const image =
+      `/uploads/${req.file.filename}`;
+
+    return res.json({
+      preview: {
+        ...suggestion,
+        price,
+        image
+      }
+    });
   }
 );
 
-/* =========================
-   UPDATE PRODUCT
-========================= */
+const port =
+  Number(process.env.PORT) || 10000;
 
-app.put(
-  "/api/admin/products/:id",
-  admin,
-  upload.single("image"),
-  (req, res) => {
-    try {
-      const id =
-        Number(req.params.id);
-
-      const product =
-        db.prepare(
-          "SELECT * FROM products WHERE id = ?"
-        ).get(id);
-
-      if (!product) {
-        return res.status(404).json({
-          error: "Product not found"
-        });
-      }
-
-      const {
-        name,
-        price,
-        old_price = 0,
-        category = "General",
-        description = "",
-        tags = "",
-        featured,
-        is_new
-  
+app.listen(
+  port,
+  "0.0.0.0",
+  () => {
+    console.log(
+      `FM FASHION API running on port ${port}`
+    );
+  }
+);
