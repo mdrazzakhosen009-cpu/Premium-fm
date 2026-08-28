@@ -1,4 +1,4 @@
-Import express from "express";
+import express from "express";
 import cookieParser from "cookie-parser";
 import multer from "multer";
 import Database from "better-sqlite3";
@@ -56,32 +56,18 @@ app.use("/uploads", express.static(UPLOADS));
 app.use("/admin", express.static(ADMIN_DIR));
 app.use(express.static(STORE_DIR));
 
-// Explicit route for store homepage
 app.get("/", (req, res) => {
     res.sendFile(path.join(STORE_DIR, "index.html"));
 });
 
-// Explicit route for admin panel
 app.get("/admin", (req, res) => {
     res.sendFile(path.join(ADMIN_DIR, "index.html"));
 });
 
 const settingsData = () => Object.fromEntries(db.prepare("SELECT key,value FROM settings").all());
-const paymentMethods = (s) => ({
-    bKash: { enabled: s.bkash_enabled === "1", number: s.bkash_number },
-    Nagad: { enabled: s.nagad_enabled === "1", number: s.nagad_number },
-    Rocket: { enabled: s.rocket_enabled === "1", number: s.rocket_number },
-    COD: { enabled: s.cod_enabled === "1", number: "" }
-});
 
-const publicProduct = p => ({...p, price: +p.price, old_price: p.old_price ? +p.old_price : null, featured: !!p.featured});
-
-function admin(req,res,next){
-    const t = req.signedCookies.admin_session;
-    if(!t) return res.status(401).json({error:"Unauthorized"});
-    const s = db.prepare("SELECT * FROM sessions WHERE token=? AND expires_at>?").get(t, Date.now());
-    function admin(req,res,next){
-    const t = req.cookies.admin_session; // signedCookies এর বদলে সরাসরি cookies ব্যবহার করা নিরাপদ যদি signed কি না থাকে
+function admin(req, res, next){
+    const t = req.cookies.admin_session;
     if(!t) return res.status(401).json({error:"Unauthorized"});
     const s = db.prepare("SELECT * FROM sessions WHERE token=? AND expires_at>?").get(t, Date.now());
     if(!s) return res.status(401).json({error:"Unauthorized"});
@@ -95,7 +81,6 @@ app.post("/api/admin/login", (req, res) => {
         const s = settingsData();
         let passHash = s.admin_password_hash;
 
-        // যদি ডাটাবেজে পাসওয়ার্ডের হাশ না থাকে, তবে এনভায়রনমেন্ট ভেরিয়েবল চেক করবে অথবা ডিফল্ট পাসওয়ার্ড সেট করবে
         if (!passHash) {
             const envPass = process.env.ADMIN_PASSWORD || "admin123";
             passHash = bcrypt.hashSync(envPass, 10);
@@ -108,12 +93,12 @@ app.post("/api/admin/login", (req, res) => {
         }
 
         const token = crypto.randomBytes(32).toString("hex");
-        const expires_at = Date.now() + 7 * 24 * 60 * 60 * 1000; // ৭ দিন মেয়াদ
+        const expires_at = Date.now() + 7 * 24 * 60 * 60 * 1000;
         db.prepare("INSERT INTO sessions(token, expires_at) VALUES(?, ?)").run(token, expires_at);
 
         res.cookie("admin_session", token, {
             httpOnly: true,
-            secure: false, // প্রোডাকশনে HTTPS হলে true করতে পারেন
+            secure: false,
             sameSite: "lax",
             maxAge: 7 * 24 * 60 * 60 * 1000
         });
@@ -125,12 +110,10 @@ app.post("/api/admin/login", (req, res) => {
     }
 });
 
-// Admin Check Auth Route
 app.get("/api/admin/me", admin, (req, res) => {
     res.json({ success: true });
 });
 
-// Admin Logout Route
 app.post("/api/admin/logout", (req, res) => {
     const t = req.cookies.admin_session;
     if (t) {
@@ -140,8 +123,86 @@ app.post("/api/admin/logout", (req, res) => {
     res.json({ success: true });
 });
 
+// Products API
+app.get("/api/products", (req, res) => {
+    const products = db.prepare("SELECT * FROM products ORDER BY id DESC").all();
+    res.json(products);
+});
+
+app.post("/api/products", admin, upload.single("image"), (req, res) => {
+    const { name, price, old_price, category, stock, featured } = req.body;
+    const image = req.file ? `/uploads/${req.file.filename}` : "";
+    const stmt = db.prepare("INSERT INTO products (name, price, old_price, image, category, stock, featured) VALUES (?, ?, ?, ?, ?, ?, ?)");
+    const info = stmt.run(name, price, old_price || null, image, category || "", stock || 0, featured ? 1 : 0);
+    res.json({ id: info.lastInsertRowid, success: true });
+});
+
+app.delete("/api/products/:id", admin, (req, res) => {
+    db.prepare("DELETE FROM products WHERE id=?").run(req.params.id);
+    res.json({ success: true });
+});
+
+// Settings API
+app.get("/api/settings", (req, res) => {
+    const s = settingsData();
+    res.json({
+        store_name: s.store_name,
+        logo: s.logo,
+        hero_title: s.hero_title,
+        hero_subtitle: s.hero_subtitle,
+        hero_image: s.hero_image,
+        payment_methods: {
+            bKash: { enabled: s.bkash_enabled === "1", number: s.bkash_number },
+            Nagad: { enabled: s.nagad_enabled === "1", number: s.nagad_number },
+            Rocket: { enabled: s.rocket_enabled === "1", number: s.rocket_number },
+            COD: { enabled: s.cod_enabled === "1", number: "" }
+        }
+    });
+});
+
+// Agents API
+app.get("/api/agents", (req, res) => {
+    const agents = db.prepare("SELECT * FROM agents").all();
+    res.json(agents);
+});
+
+// Orders API
+app.post("/api/orders", (req, res) => {
+    const { name, phone, email, division, district, upazila, address, items, total } = req.body;
+    const stmt = db.prepare("INSERT INTO orders (customer_name, phone, email, division, district, upazila, address, items, total_amount, delivery_charge) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?)");
+    const info = stmt.run(name || "Customer", phone || "", email || "", division || "", district || "", upazila || "", address || "", JSON.stringify(items || []), total || 0, 60);
+    res.json({ orderId: info.lastInsertRowid, total });
+});
+
+app.get("/api/orders", admin, (req, res) => {
+    const orders = db.prepare("SELECT * FROM orders ORDER BY id DESC").all();
+    res.json(orders);
+});
+
+// AI Chat API
+app.post("/api/chat", (req, res) => {
+    try {
+        const { message } = req.body;
+        let reply = "দুঃখিত, আমি এই মুহূর্তে বুঝতে পারিনি। অনুগ্রহ করে আমাদের কোনো এজেন্টের সাথে যোগাযোগ করুন।";
+        
+        const msg = (message || "").toLowerCase();
+        if (msg.includes("hello") || msg.includes("hi") || msg.includes("সালাম")) {
+            reply = "আসসালামু আলাইকুম! এফএম ফ্যাশনে আপনাকে স্বাগতম। কীভাবে সাহায্য করতে পারি?";
+        } else if (msg.includes("price") || msg.includes("দাম")) {
+            reply = "আমাদের প্রতিটি পণ্যের নিচে মূল্য দেওয়া আছে। আপনার পছন্দের পণ্যটি কার্টে যোগ করে অর্ডার করতে পারেন।";
+        } else if (msg.includes("delivery") || msg.includes("ডেলিভারি")) {
+            reply = "ঢাকার ভেতরে ডেলিভারি চার্জ ৬০ টাকা এবং ঢাকার বাইরে ১২০ টাকা।";
+        }
+
+        res.json({ reply });
+    } catch (err) {
+        console.error(err);
+        res.status(500).json({ error: "Chat service error" });
+    }
+});
+
 const PORT = process.env.PORT || 3000;
 app.listen(PORT, () => {
     console.log(`Server is running on port ${PORT}`);
 });
-            
+        
