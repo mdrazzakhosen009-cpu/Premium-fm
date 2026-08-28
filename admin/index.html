@@ -1,13 +1,31 @@
-<div id="login" class="login-container">
-  <form id="loginForm" onsubmit="event.preventDefault(); loginUser();">
-    <div class="logo-box">
-      <img src="" alt="" style="display:none;" />
-    </div>
-    <h2>Admin Control Center</h2>
-    <p class="subtitle">শুধু authorized admin access.</p>
-    
-    <input type="password" id="password" placeholder="Admin password" required />
-    <button type="submit" id="loginBtn">Secure Sign In</button>
-    <div id="loginError" style="color: #ff4d4d; margin-top: 10px; font-size: 14px;"></div>
-  </form>
-</div>
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Admin Control Center - FM FASHION</title>
+  <link rel="stylesheet" href="style.css">
+</head>
+<body>
+
+  <div id="login" class="login-container">
+    <form id="loginForm" onsubmit="event.preventDefault(); loginUser();">
+      <div class="logo-box">
+        <img src="" alt="" style="display:none;" />
+      </div>
+      <h2>Admin Control Center</h2>
+      <p class="subtitle">শুধু authorized admin access.</p>
+      
+      <input type="password" id="password" placeholder="Admin password" required />
+      <button type="submit" id="loginBtn">Secure Sign In</button>
+      <div id="loginError" style="color: #ff4d4d; margin-top: 10px; font-size: 14px;"></div>
+    </form>
+  </div>
+
+  <div id="app" hidden>
+    <!-- আপনার মূল ড্যাশবোর্ড কন্টেন্ট এখানে থাকবে -->
+  </div>
+
+  <script src="app.js"></script>
+</body>
+</html>
