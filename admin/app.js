@@ -7,7 +7,18 @@ async function api(path,opt={}){opt.credentials="include";const r=await fetch(AP
 function toast(msg){let el=document.getElementById("adminToast");if(!el){el=document.createElement("div");el.id="adminToast";el.style.cssText="position:fixed;right:18px;bottom:18px;z-index:9999;background:#111;color:#fff;padding:12px 16px;border-radius:12px;box-shadow:0 10px 30px #0004";document.body.appendChild(el)}el.textContent=msg;el.hidden=false;clearTimeout(el._t);el._t=setTimeout(()=>el.hidden=true,2500)}
 function formDataObject(form){return Object.fromEntries(new FormData(form));}
 function setupTabs(){document.querySelectorAll(".tab").forEach(b=>b.onclick=()=>{document.querySelectorAll(".tab").forEach(x=>x.classList.toggle("active",x===b));document.querySelectorAll(".panel").forEach(x=>x.classList.toggle("active",x.id===b.dataset.tab));});}
-async function login(e){e.preventDefault();const password=$("#password").value;try{await api("/api/admin/login",{method:"POST",headers:{"Content-Type":"application/json"},body:JSON.stringify({password})});$("#login").hidden=true;$("#app").hidden=false;await loadAll();toast("Login successful");}catch(err){$("#loginError").textContent=err.message;}}
+async function login(e){
+    e.preventDefault();
+    try {
+        await api("/api/admin/login", {method:"POST", body: new URLSearchParams({password: $("#password").value})});
+        document.getElementById("login").style.display = "none";
+        document.getElementById("app").style.display = "block";
+        loadAll();
+    } catch(err) {
+        toast("Invalid password!");
+    }
+}
+
 async function logout(){try{await api("/api/admin/logout",{method:"POST"})}catch{}location.reload()}
 function renderProducts(){
  $("#productTable").innerHTML=state.products.length?`<div class="table-wrap"><table><thead><tr><th>Product</th><th>Price</th><th>Category</th><th>Flags</th><th>Action</th></tr></thead><tbody>${state.products.map(p=>`<tr><td><div style="display:flex;gap:10px;align-items:center"><img src="${esc(imageUrl(p.image))}" style="width:52px;height:52px;object-fit:cover;border-radius:10px"><div><b>${esc(p.name)}</b><small style="display:block">#${p.id}</small></div></div></td><td>${money(p.price)} ${p.old_price?`<del>${money(p.old_price)}</del>`:""}</td><td>${esc(p.category||"General")}</td><td>${p.featured?"Featured ":""}${p.is_new?"New":""}</td><td><button onclick="editProduct(${p.id})">Edit</button> <button onclick="deleteProduct(${p.id})">Delete</button></td></tr>`).join("")}</tbody></table></div>`:`<div class="empty">No products yet. Add your first product.</div>`;
